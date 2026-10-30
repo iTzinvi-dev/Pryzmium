@@ -4376,7 +4376,7 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-[100dvh] w-full theme-canvas flex flex-col justify-between p-4 sm:p-6 overflow-y-auto overflow-x-hidden">
+      <div className="min-h-[100dvh] w-full theme-canvas flex flex-col justify-between overflow-y-auto overflow-x-hidden">
         <LegalSecurityModal
           open={authPolicyModalOpen}
           mode="consent"
@@ -4394,16 +4394,13 @@ export default function App() {
           }}
         />
 
-        <header className="relative z-10 w-full max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-2 pb-4 border-b theme-border">
-          <PryzmiumLogo />
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[11px] theme-text-muted">
-              One-Time Mandatory Compliance Onboarding
-            </span>
+        <header className="relative z-10 w-full border-b theme-border theme-surface px-4 sm:px-8 py-3.5">
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
+            <PryzmiumLogo />
             <button
               type="button"
               onClick={() => openLegalHub('privacy')}
-              className="inline-flex items-center gap-1.5 rounded-lg border theme-border theme-surface px-2.5 py-1 text-[11px] font-medium theme-text-primary hover:opacity-85 transition-opacity"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border theme-border theme-elevated px-3 font-mono text-[11px] font-medium theme-text-primary hover:opacity-85 transition-opacity"
             >
               <ShieldCheck
                 className="h-3.5 w-3.5 shrink-0"
@@ -4414,15 +4411,18 @@ export default function App() {
           </div>
         </header>
 
-        <main className="relative z-10 w-full flex-1 flex items-center justify-center py-6">
+        <main className="relative z-10 w-full flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
           <section
             aria-labelledby="auth-heading"
-            className="w-full max-w-md mx-auto my-auto theme-elevated border theme-border rounded-2xl p-5 sm:p-8 flex flex-col gap-5 shadow-xs animate-view-enter"
+            className="w-full max-w-[440px] mx-auto my-auto theme-elevated border theme-border rounded-xl overflow-hidden shadow-xs animate-view-enter"
           >
-            <header className="space-y-1.5">
+            <header className="border-b theme-border theme-surface px-5 sm:px-7 py-5 space-y-1.5">
+              <p className="font-mono text-[10px] uppercase tracking-widest theme-text-muted">
+                Workspace Access
+              </p>
               <h1
                 id="auth-heading"
-                className="font-display text-2xl sm:text-3xl font-bold tracking-tight theme-text-primary"
+                className="font-display text-xl sm:text-2xl font-bold tracking-tight theme-text-primary"
               >
                 {authMode === 'signin' ? 'Sign in to Pryzmium' : 'Create your account'}
               </h1>
@@ -4433,317 +4433,311 @@ export default function App() {
               </p>
             </header>
 
-            <div
-              role="tablist"
-              aria-label="Authentication mode"
-              className="grid grid-cols-2 gap-1 rounded-xl border theme-border theme-surface p-1"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={authMode === 'signin'}
-                onClick={() => {
-                  setAuthMode('signin');
-                  setAuthError(null);
-                }}
-                className={`h-11 rounded-lg text-xs font-medium transition-colors ${
-                  authMode === 'signin'
-                    ? 'theme-btn-primary font-semibold'
-                    : 'theme-text-secondary hover:opacity-85'
-                }`}
+            <div className="p-5 sm:p-7 flex flex-col gap-4">
+              <div
+                role="tablist"
+                aria-label="Authentication mode"
+                className="grid grid-cols-2 gap-1 rounded-lg border theme-border theme-surface p-1"
               >
-                Sign In
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={authMode === 'signup'}
-                onClick={() => {
-                  setAuthMode('signup');
-                  setAuthError(null);
-                }}
-                className={`h-11 rounded-lg text-xs font-medium transition-colors ${
-                  authMode === 'signup'
-                    ? 'theme-btn-primary font-semibold'
-                    : 'theme-text-secondary hover:opacity-85'
-                }`}
-              >
-                Create Account
-              </button>
-            </div>
-
-            <div className="rounded-xl border theme-border theme-surface p-3.5 space-y-2.5 text-xs theme-text-primary">
-              <label className="flex items-start gap-2.5 cursor-pointer select-none theme-text-primary">
-                <input
-                  type="checkbox"
-                  checked={acceptedAuthPolicy}
-                  onChange={(e) => {
-                    setAcceptedAuthPolicy(e.target.checked);
-                    if (e.target.checked) setAuthError(null);
-                  }}
-                  className="mt-0.5 h-4 w-4 rounded shrink-0"
-                  style={{ accentColor: 'var(--accent-primary)' }}
-                />
-                <span className="leading-relaxed theme-text-secondary">
-                  I accept the mandatory{' '}
-                  <strong className="font-semibold theme-text-primary">
-                    Privacy Policy, Cookie Policy &amp; Terms of User Agreement
-                  </strong>{' '}
-                  required by international data protection regulations before using the web app.
-                </span>
-              </label>
-
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t theme-border">
-                <span className="text-[11px] font-mono theme-text-muted">
-                  One-time onboarding consent
-                </span>
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={authMode === 'signin'}
                   onClick={() => {
-                    setAuthPolicyInitialTab('privacy');
-                    setAuthPolicyModalOpen(true);
+                    setAuthMode('signin');
+                    setAuthError(null);
                   }}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold underline underline-offset-2 hover:opacity-80"
-                  style={{ color: 'var(--accent-primary)' }}
+                  className={`h-9 rounded-md font-mono text-xs font-medium transition-colors ${
+                    authMode === 'signin'
+                      ? 'theme-btn-primary font-semibold'
+                      : 'theme-text-secondary hover:opacity-85'
+                  }`}
                 >
-                  <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-                  <span>Read Full Policy &amp; Agreement</span>
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={authMode === 'signup'}
+                  onClick={() => {
+                    setAuthMode('signup');
+                    setAuthError(null);
+                  }}
+                  className={`h-9 rounded-md font-mono text-xs font-medium transition-colors ${
+                    authMode === 'signup'
+                      ? 'theme-btn-primary font-semibold'
+                      : 'theme-text-secondary hover:opacity-85'
+                  }`}
+                >
+                  Create Account
                 </button>
               </div>
-            </div>
 
-            {authError && (
-              <div
-                role="alert"
-                className="rounded-xl border theme-border theme-surface px-3.5 py-2.5 text-xs theme-text-primary flex items-start gap-2"
-              >
-                <AlertCircle
-                  className="h-4 w-4 shrink-0 mt-0.5"
-                  style={{ color: 'var(--status-destructive)' }}
-                />
-                <span>{authError}</span>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <button
-                type="button"
-                disabled={isSigningIn || !signInLimitStatus.allowed}
-                onClick={handleGoogleBasicLogin}
-                className="w-full h-12 inline-flex items-center justify-center gap-2.5 rounded-xl border theme-border theme-surface px-4 text-xs font-semibold theme-text-primary hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                <svg
-                  version="1.1"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 48 48"
-                  className="h-4 w-4 shrink-0"
-                  aria-hidden="true"
+              {authError && (
+                <div
+                  role="alert"
+                  className="rounded-lg border theme-border theme-surface px-3.5 py-2.5 text-xs theme-text-primary flex items-start gap-2"
                 >
-                  <path
-                    fill="#EA4335"
-                    d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+                  <AlertCircle
+                    className="h-4 w-4 shrink-0 mt-0.5"
+                    style={{ color: 'var(--status-destructive)' }}
                   />
-                  <path
-                    fill="#4285F4"
-                    d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
-                  />
-                </svg>
-                <span>{isSigningIn ? 'Signing in…' : 'Continue with Google'}</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-3 text-[11px] font-mono theme-text-muted">
-              <div className="flex-1 border-t theme-border" />
-              <span>OR EMAIL</span>
-              <div className="flex-1 border-t theme-border" />
-            </div>
-
-            <form onSubmit={handleEmailAuthSubmit} className="flex flex-col gap-3.5">
-              {authMode === 'signup' && (
-                <div>
-                  <label
-                    htmlFor="auth-display-name"
-                    className="block text-xs font-medium theme-text-secondary mb-1"
-                  >
-                    Display Name
-                  </label>
-                  <input
-                    id="auth-display-name"
-                    type="text"
-                    required
-                    autoComplete="name"
-                    enterKeyHint="next"
-                    value={displayNameInput}
-                    onChange={(e) => setDisplayNameInput(e.target.value)}
-                    placeholder="Your name"
-                    maxLength={80}
-                    className="h-12 w-full rounded-xl border theme-border theme-canvas px-3.5 text-base md:text-xs theme-text-primary placeholder:opacity-50 focus:outline-none"
-                  />
+                  <span>{authError}</span>
                 </div>
               )}
 
               <div>
-                <label
-                  htmlFor="auth-email"
-                  className="block text-xs font-medium theme-text-secondary mb-1"
+                <button
+                  type="button"
+                  disabled={isSigningIn || !signInLimitStatus.allowed}
+                  onClick={handleGoogleBasicLogin}
+                  className="w-full h-11 inline-flex items-center justify-center gap-2.5 rounded-lg border theme-border theme-surface px-4 text-xs font-semibold theme-text-primary hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
-                  Email Address
-                </label>
-                <input
-                  id="auth-email"
-                  type="email"
-                  inputMode="email"
-                  required
-                  autoComplete="email"
-                  enterKeyHint="next"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="you@example.com"
-                  className="h-12 w-full rounded-xl border theme-border theme-canvas px-3.5 text-base md:text-xs theme-text-primary placeholder:opacity-50 focus:outline-none"
-                />
+                  <svg
+                    version="1.1"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 48 48"
+                    className="h-4 w-4 shrink-0"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill="#EA4335"
+                      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+                    />
+                    <path
+                      fill="#4285F4"
+                      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+                    />
+                  </svg>
+                  <span>{isSigningIn ? 'Signing in…' : 'Continue with Google'}</span>
+                </button>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-widest theme-text-muted">
+                <div className="flex-1 border-t theme-border" />
+                <span>Or Email</span>
+                <div className="flex-1 border-t theme-border" />
+              </div>
+
+              <form onSubmit={handleEmailAuthSubmit} className="flex flex-col gap-3.5">
+                {authMode === 'signup' && (
+                  <div>
+                    <label
+                      htmlFor="auth-display-name"
+                      className="block font-mono text-[11px] uppercase tracking-wider theme-text-secondary mb-1.5"
+                    >
+                      Display Name
+                    </label>
+                    <input
+                      id="auth-display-name"
+                      type="text"
+                      required
+                      autoComplete="name"
+                      enterKeyHint="next"
+                      value={displayNameInput}
+                      onChange={(e) => setDisplayNameInput(e.target.value)}
+                      placeholder="Your name"
+                      maxLength={80}
+                      className="h-11 w-full rounded-lg border theme-border theme-canvas px-3.5 text-base md:text-xs theme-text-primary placeholder:opacity-50 focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                <div>
                   <label
-                    htmlFor="auth-password"
-                    className="text-xs font-medium theme-text-secondary"
+                    htmlFor="auth-email"
+                    className="block font-mono text-[11px] uppercase tracking-wider theme-text-secondary mb-1.5"
                   >
-                    Password
+                    Email Address
                   </label>
-                  {authMode === 'signup' && passwordInput && (
-                    <span className="font-mono text-[10px] theme-text-muted">
-                      {pwStrength.label}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center h-12 w-full rounded-xl border theme-border theme-canvas overflow-hidden">
                   <input
-                    id="auth-password"
-                    type={showPassword ? 'text' : 'password'}
+                    id="auth-email"
+                    type="email"
+                    inputMode="email"
                     required
-                    minLength={6}
-                    autoComplete={authMode === 'signin' ? 'current-password' : 'new-password'}
-                    enterKeyHint={authMode === 'signin' ? 'go' : 'next'}
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    placeholder="Minimum 6 characters"
-                    className="flex-1 h-full min-w-0 bg-transparent px-3.5 text-base md:text-xs theme-text-primary placeholder:opacity-50 focus:outline-none"
+                    autoComplete="email"
+                    enterKeyHint="next"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    placeholder="you@example.com"
+                    className="h-11 w-full rounded-lg border theme-border theme-canvas px-3.5 text-base md:text-xs theme-text-primary placeholder:opacity-50 focus:outline-none"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="inline-flex min-w-[44px] min-h-[44px] items-center justify-center theme-text-muted hover:opacity-80 shrink-0"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label
+                      htmlFor="auth-password"
+                      className="font-mono text-[11px] uppercase tracking-wider theme-text-secondary"
+                    >
+                      Password
+                    </label>
+                    {authMode === 'signup' && passwordInput && (
+                      <span className="font-mono text-[10px] theme-text-muted">
+                        {pwStrength.label}
+                      </span>
                     )}
-                  </button>
+                  </div>
+                  <div className="flex items-center h-11 w-full rounded-lg border theme-border theme-canvas overflow-hidden">
+                    <input
+                      id="auth-password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      autoComplete={authMode === 'signin' ? 'current-password' : 'new-password'}
+                      enterKeyHint={authMode === 'signin' ? 'go' : 'next'}
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="Minimum 6 characters"
+                      className="flex-1 h-full min-w-0 bg-transparent px-3.5 text-base md:text-xs theme-text-primary placeholder:opacity-50 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="inline-flex min-w-[42px] h-full items-center justify-center theme-text-muted hover:opacity-80 shrink-0"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+
+                  {authMode === 'signup' && (
+                    <div className="grid grid-cols-4 gap-1.5 mt-1.5">
+                      {[1, 2, 3, 4].map((bar) => (
+                        <div
+                          key={bar}
+                          className="h-1 rounded-full transition-colors"
+                          style={{
+                            backgroundColor:
+                              pwStrength.score >= bar
+                                ? pwStrength.score >= 3
+                                  ? 'var(--status-read)'
+                                  : 'var(--status-write)'
+                                : 'var(--border-hairline)'
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {authMode === 'signup' && (
-                  <div className="grid grid-cols-4 gap-1.5 mt-1.5">
-                    {[1, 2, 3, 4].map((bar) => (
-                      <div
-                        key={bar}
-                        className="h-1 rounded-full transition-colors"
-                        style={{
-                          backgroundColor:
-                            pwStrength.score >= bar
-                              ? pwStrength.score >= 3
-                                ? 'var(--status-read)'
-                                : 'var(--status-write)'
-                              : 'var(--border-hairline)'
-                        }}
-                      />
-                    ))}
+                  <div>
+                    <label
+                      htmlFor="auth-confirm-password"
+                      className="block font-mono text-[11px] uppercase tracking-wider theme-text-secondary mb-1.5"
+                    >
+                      Confirm Password
+                    </label>
+                    <input
+                      id="auth-confirm-password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      autoComplete="new-password"
+                      enterKeyHint="go"
+                      value={confirmPasswordInput}
+                      onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                      placeholder="Re-enter password"
+                      className="h-11 w-full rounded-lg border theme-border theme-canvas px-3.5 text-base md:text-xs theme-text-primary placeholder:opacity-50 focus:outline-none"
+                    />
                   </div>
                 )}
-              </div>
 
-              {authMode === 'signup' && (
-                <div>
-                  <label
-                    htmlFor="auth-confirm-password"
-                    className="block text-xs font-medium theme-text-secondary mb-1"
-                  >
-                    Confirm Password
+                <button
+                  type="submit"
+                  disabled={isSigningIn || !signInLimitStatus.allowed}
+                  className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-lg theme-btn-primary px-4 text-xs font-semibold transition-colors disabled:opacity-50 mt-0.5"
+                >
+                  {isSigningIn ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : authMode === 'signin' ? (
+                    <Mail className="h-4 w-4" />
+                  ) : (
+                    <UserPlus className="h-4 w-4" />
+                  )}
+                  <span>
+                    {isSigningIn
+                      ? 'Signing in…'
+                      : authMode === 'signin'
+                        ? 'Sign In'
+                        : 'Create Account'}
+                  </span>
+                </button>
+
+                <div className="rounded-lg border theme-border theme-surface p-3.5 space-y-2.5 text-xs theme-text-primary mt-1">
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none theme-text-primary">
+                    <input
+                      type="checkbox"
+                      checked={acceptedAuthPolicy}
+                      onChange={(e) => {
+                        setAcceptedAuthPolicy(e.target.checked);
+                        if (e.target.checked) setAuthError(null);
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded shrink-0"
+                      style={{ accentColor: 'var(--accent-primary)' }}
+                    />
+                    <span className="leading-relaxed theme-text-secondary">
+                      I accept the mandatory{' '}
+                      <button
+                        type="button"
+                        onClick={() => openLegalHub('privacy')}
+                        className="underline font-semibold theme-text-primary hover:opacity-80"
+                      >
+                        Privacy Policy
+                      </button>
+                      ,{' '}
+                      <button
+                        type="button"
+                        onClick={() => openLegalHub('terms')}
+                        className="underline font-semibold theme-text-primary hover:opacity-80"
+                      >
+                        Terms of Service
+                      </button>
+                      , and{' '}
+                      <button
+                        type="button"
+                        onClick={() => openLegalHub('safety')}
+                        className="underline font-semibold theme-text-primary hover:opacity-80"
+                      >
+                        Safety Rules
+                      </button>
+                      .
+                    </span>
                   </label>
-                  <input
-                    id="auth-confirm-password"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    minLength={6}
-                    autoComplete="new-password"
-                    enterKeyHint="go"
-                    value={confirmPasswordInput}
-                    onChange={(e) => setConfirmPasswordInput(e.target.value)}
-                    placeholder="Re-enter password"
-                    className="h-12 w-full rounded-xl border theme-border theme-canvas px-3.5 text-base md:text-xs theme-text-primary placeholder:opacity-50 focus:outline-none"
-                  />
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t theme-border">
+                    <span className="text-[10px] font-mono uppercase tracking-wider theme-text-muted">
+                      Compliance Consent
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthPolicyInitialTab('privacy');
+                        setAuthPolicyModalOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold underline underline-offset-2 hover:opacity-80"
+                      style={{ color: 'var(--accent-primary)' }}
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                      <span>Read Full Policy &amp; Agreement</span>
+                    </button>
+                  </div>
                 </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSigningIn || !signInLimitStatus.allowed}
-                className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-xl theme-btn-primary px-4 text-xs font-semibold transition-colors disabled:opacity-50"
-              >
-                {isSigningIn ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : authMode === 'signin' ? (
-                  <Mail className="h-4 w-4" />
-                ) : (
-                  <UserPlus className="h-4 w-4" />
-                )}
-                <span>
-                  {isSigningIn
-                    ? 'Signing in…'
-                    : authMode === 'signin'
-                      ? 'Sign In'
-                      : 'Create Account'}
-                </span>
-              </button>
-
-              <div className="rounded-xl border theme-border theme-surface px-3.5 py-3 text-xs theme-text-secondary text-center leading-relaxed">
-                <span>By signing in, you agree to our</span>{' '}
-                <button
-                  type="button"
-                  onClick={() => openLegalHub('terms')}
-                  className="underline font-medium theme-text-primary hover:opacity-80 p-1"
-                >
-                  Terms of Service
-                </button>
-                ,{' '}
-                <button
-                  type="button"
-                  onClick={() => openLegalHub('privacy')}
-                  className="underline font-medium theme-text-primary hover:opacity-80 p-1"
-                >
-                  Privacy Policy
-                </button>
-                , and{' '}
-                <button
-                  type="button"
-                  onClick={() => openLegalHub('safety')}
-                  className="underline font-medium theme-text-primary hover:opacity-80 p-1"
-                >
-                  Safety Rules
-                </button>
-                .
-              </div>
-            </form>
+              </form>
+            </div>
           </section>
         </main>
 

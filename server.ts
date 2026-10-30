@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import dns from 'node:dns';
 import net from 'node:net';
 import express, { NextFunction, Request, Response } from 'express';
-import { createServer as createViteServer } from 'vite';
 import { z } from 'zod';
 import { runBoundedAgentLoop } from './src/lib/agent/loop.ts';
 
@@ -1400,6 +1399,7 @@ app.use(express.json({ limit: '256kb' }));
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true, hmr: false },
       appType: 'spa'

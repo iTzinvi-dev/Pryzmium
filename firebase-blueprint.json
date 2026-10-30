@@ -1,0 +1,381 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile, subscription plan, and daily usage telemetry counters.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified email address of the user.",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name of the user.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "plan": {
+          "type": "string",
+          "description": "Active workspace tier.",
+          "enum": ["free", "pro"],
+          "maxLength": 16
+        },
+        "dailyRequestsCount": {
+          "type": "number",
+          "description": "Number of agent requests made in the current UTC day."
+        },
+        "dailyTokensUsed": {
+          "type": "number",
+          "description": "Approximate tokens consumed in the current UTC day."
+        },
+        "lastResetDate": {
+          "type": "string",
+          "description": "ISO date string (YYYY-MM-DD) for daily counter reset.",
+          "minLength": 10,
+          "maxLength": 10
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of profile creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last profile update."
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "displayName",
+        "plan",
+        "dailyRequestsCount",
+        "dailyTokensUsed",
+        "lastResetDate",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChatSession": {
+      "title": "ChatSession",
+      "description": "Individual conversation thread with a selected allowlisted AI model.",
+      "type": "object",
+      "properties": {
+        "chatId": {
+          "type": "string",
+          "description": "Unique identifier of the chat session.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Owner UID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Conversation title.",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "modelId": {
+          "type": "string",
+          "description": "Selected model ID from the allowlist.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["chatId", "uid", "title", "modelId", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Single message inside a chat session.",
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "Unique message identifier.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "chatId": {
+          "type": "string",
+          "description": "Parent chat identifier.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Owner UID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "role": {
+          "type": "string",
+          "description": "Message author role.",
+          "enum": ["user", "assistant", "system"],
+          "maxLength": 16
+        },
+        "content": {
+          "type": "string",
+          "description": "Trimmed message text content.",
+          "minLength": 1,
+          "maxLength": 16000
+        },
+        "modelId": {
+          "type": "string",
+          "description": "Model that generated or received the message.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "fallbackNotice": {
+          "type": "string",
+          "description": "Optional fallback explanation if primary model failed.",
+          "maxLength": 500
+        },
+        "toolTraceSummary": {
+          "type": "string",
+          "description": "Compact summary of tool invocations during this turn.",
+          "maxLength": 4000
+        },
+        "pendingActionId": {
+          "type": "string",
+          "description": "Optional reference to a pending confirmation action.",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp."
+        }
+      },
+      "required": ["messageId", "chatId", "uid", "role", "content", "modelId", "createdAt"]
+    },
+    "EncryptedConnection": {
+      "title": "EncryptedConnection",
+      "description": "Server-only encrypted OAuth token vault. Strictly inaccessible to clients.",
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "encryptedRefreshToken": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": ["provider", "encryptedRefreshToken"]
+    },
+    "PendingAction": {
+      "title": "PendingAction",
+      "description": "Server-signed confirmation request for write or destructive tool calls.",
+      "type": "object",
+      "properties": {
+        "actionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "chatId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "toolName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "risk": {
+          "type": "string",
+          "enum": ["write", "destructive"],
+          "maxLength": 16
+        },
+        "argsPreview": {
+          "type": "string",
+          "description": "Canonical JSON representation of actual arguments for user review.",
+          "minLength": 2,
+          "maxLength": 8000
+        },
+        "argsHash": {
+          "type": "string",
+          "description": "SHA-256 hex digest of canonical arguments.",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "serverSignature": {
+          "type": "string",
+          "description": "HMAC-SHA256 server signature binding uid, actionId, toolName, argsHash, and expiresAtMs.",
+          "minLength": 64,
+          "maxLength": 64
+        },
+        "warningText": {
+          "type": "string",
+          "description": "Prompt injection or external recipient warning.",
+          "maxLength": 600
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "executed", "rejected", "expired"],
+          "maxLength": 16
+        },
+        "expiresAtMs": {
+          "type": "number",
+          "description": "Epoch milliseconds when this confirmation expires (10 minutes from creation)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "actionId",
+        "uid",
+        "chatId",
+        "toolName",
+        "risk",
+        "argsPreview",
+        "argsHash",
+        "serverSignature",
+        "warningText",
+        "status",
+        "expiresAtMs",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AuditLogEntry": {
+      "title": "AuditLogEntry",
+      "description": "Immutable metadata record of every tool execution or confirmation event.",
+      "type": "object",
+      "properties": {
+        "logId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "chatId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "toolName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "risk": {
+          "type": "string",
+          "enum": ["read", "write", "destructive"],
+          "maxLength": 16
+        },
+        "summary": {
+          "type": "string",
+          "description": "Metadata summary only, never storing sensitive body text.",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "paused_for_confirm", "executed", "rejected", "error"],
+          "maxLength": 24
+        },
+        "durationMs": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "logId",
+        "uid",
+        "chatId",
+        "toolName",
+        "risk",
+        "summary",
+        "status",
+        "durationMs",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile, plan, and daily usage telemetry."
+    },
+    "/users/{userId}/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/ChatSession" },
+      "description": "User chat threads."
+    },
+    "/users/{userId}/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Messages inside a user chat thread."
+    },
+    "/users/{userId}/connections/{providerId}": {
+      "schema": { "$ref": "#/entities/EncryptedConnection" },
+      "description": "Encrypted OAuth connection vault (client access strictly denied)."
+    },
+    "/users/{userId}/pendingActions/{actionId}": {
+      "schema": { "$ref": "#/entities/PendingAction" },
+      "description": "Pending write/destructive tool confirmations."
+    },
+    "/users/{userId}/auditLog/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLogEntry" },
+      "description": "Metadata audit log of tool invocations."
+    }
+  }
+}

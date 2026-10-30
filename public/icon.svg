@@ -1,0 +1,22 @@
+<svg width="512" height="512" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100" height="100" rx="22" fill="#231F1D" />
+  <defs>
+    <linearGradient id="pryzm-nav-grad" x1="40" y1="14" x2="88" y2="68" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E87A5D" />
+      <stop offset="100%" stop-color="#B84B30" />
+    </linearGradient>
+  </defs>
+  <path
+    fill-rule="evenodd"
+    clip-rule="evenodd"
+    d="M22 14 H64 L88 42 L56 66 H40 V88 H22 V14 Z M40 30 V52 L64 42 L40 30 Z"
+    fill="#FFFFCC"
+  />
+  <path
+    fill-rule="evenodd"
+    clip-rule="evenodd"
+    d="M40 14 H64 L88 42 L56 66 L40 52 V30 L64 42 L40 14 Z"
+    fill="url(#pryzm-nav-grad)"
+  />
+  <circle cx="72" cy="76" r="7" fill="#D97757" />
+</svg>

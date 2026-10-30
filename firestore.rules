@@ -1,0 +1,448 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && (
+          request.auth.token.email_verified == true
+          || request.auth.token.firebase.sign_in_provider == 'password'
+        );
+    }
+
+    function isValidId(id) {
+      return id is string
+        && id.size() >= 1
+        && id.size() <= 128
+        && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'email',
+          'displayName',
+          'plan',
+          'dailyRequestsCount',
+          'dailyTokensUsed',
+          'lastResetDate',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'plan',
+          'dailyRequestsCount',
+          'dailyTokensUsed',
+          'lastResetDate',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid is string
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && data.uid == request.auth.uid
+        && data.uid == userId
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 254
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 120
+        && data.plan is string
+        && data.plan.size() <= 16
+        && (data.plan == 'free' || data.plan == 'pro')
+        && data.dailyRequestsCount is number
+        && data.dailyRequestsCount >= 0
+        && data.dailyRequestsCount <= 10000
+        && data.dailyTokensUsed is number
+        && data.dailyTokensUsed >= 0
+        && data.dailyTokensUsed <= 10000000
+        && data.lastResetDate is string
+        && data.lastResetDate.size() == 10
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidChatSession(data, userId, chatId) {
+      return data.keys().hasAll([
+          'chatId',
+          'uid',
+          'title',
+          'modelId',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'chatId',
+          'uid',
+          'title',
+          'modelId',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.chatId is string
+        && data.chatId.size() >= 1
+        && data.chatId.size() <= 128
+        && data.chatId == chatId
+        && data.uid is string
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && data.uid == request.auth.uid
+        && data.uid == userId
+        && data.title is string
+        && data.title.size() >= 1
+        && data.title.size() <= 160
+        && data.modelId is string
+        && data.modelId.size() >= 1
+        && data.modelId.size() <= 120
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidChatMessage(data, userId, chatId, messageId) {
+      return data.keys().hasAll([
+          'messageId',
+          'chatId',
+          'uid',
+          'role',
+          'content',
+          'modelId',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'messageId',
+          'chatId',
+          'uid',
+          'role',
+          'content',
+          'modelId',
+          'fallbackNotice',
+          'toolTraceSummary',
+          'pendingActionId',
+          'createdAt'
+        ])
+        && data.messageId is string
+        && data.messageId.size() >= 1
+        && data.messageId.size() <= 128
+        && data.messageId == messageId
+        && data.chatId is string
+        && data.chatId.size() >= 1
+        && data.chatId.size() <= 128
+        && data.chatId == chatId
+        && data.uid is string
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && data.uid == request.auth.uid
+        && data.uid == userId
+        && data.role is string
+        && data.role.size() <= 16
+        && (data.role == 'user' || data.role == 'assistant' || data.role == 'system')
+        && data.content is string
+        && data.content.size() >= 1
+        && data.content.size() <= 16000
+        && data.modelId is string
+        && data.modelId.size() >= 1
+        && data.modelId.size() <= 120
+        && (!('fallbackNotice' in data) || (data.fallbackNotice is string && data.fallbackNotice.size() <= 500))
+        && (!('toolTraceSummary' in data) || (data.toolTraceSummary is string && data.toolTraceSummary.size() <= 4000))
+        && (!('pendingActionId' in data) || (data.pendingActionId is string && data.pendingActionId.size() <= 128))
+        && data.createdAt is timestamp;
+    }
+
+    function isValidPendingAction(data, userId, actionId) {
+      return data.keys().hasAll([
+          'actionId',
+          'uid',
+          'chatId',
+          'toolName',
+          'risk',
+          'argsPreview',
+          'argsHash',
+          'serverSignature',
+          'warningText',
+          'status',
+          'expiresAtMs',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'actionId',
+          'uid',
+          'chatId',
+          'toolName',
+          'risk',
+          'argsPreview',
+          'argsHash',
+          'serverSignature',
+          'warningText',
+          'status',
+          'expiresAtMs',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.actionId is string
+        && data.actionId.size() >= 1
+        && data.actionId.size() <= 128
+        && data.actionId == actionId
+        && data.uid is string
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && data.uid == request.auth.uid
+        && data.uid == userId
+        && data.chatId is string
+        && data.chatId.size() >= 1
+        && data.chatId.size() <= 128
+        && isValidId(data.chatId)
+        && data.toolName is string
+        && data.toolName.size() >= 1
+        && data.toolName.size() <= 80
+        && data.risk is string
+        && data.risk.size() <= 16
+        && (data.risk == 'write' || data.risk == 'destructive')
+        && data.argsPreview is string
+        && data.argsPreview.size() >= 2
+        && data.argsPreview.size() <= 8000
+        && data.argsHash is string
+        && data.argsHash.size() == 64
+        && data.serverSignature is string
+        && data.serverSignature.size() == 64
+        && data.warningText is string
+        && data.warningText.size() <= 600
+        && data.status is string
+        && data.status.size() <= 16
+        && (data.status == 'pending' || data.status == 'executed' || data.status == 'rejected' || data.status == 'expired')
+        && data.expiresAtMs is number
+        && data.expiresAtMs > 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLogEntry(data, userId, logId) {
+      return data.keys().hasAll([
+          'logId',
+          'uid',
+          'chatId',
+          'toolName',
+          'risk',
+          'summary',
+          'status',
+          'durationMs',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'logId',
+          'uid',
+          'chatId',
+          'toolName',
+          'risk',
+          'summary',
+          'status',
+          'durationMs',
+          'createdAt'
+        ])
+        && data.logId is string
+        && data.logId.size() >= 1
+        && data.logId.size() <= 128
+        && data.logId == logId
+        && data.uid is string
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && data.uid == request.auth.uid
+        && data.uid == userId
+        && data.chatId is string
+        && data.chatId.size() >= 1
+        && data.chatId.size() <= 128
+        && isValidId(data.chatId)
+        && data.toolName is string
+        && data.toolName.size() >= 1
+        && data.toolName.size() <= 80
+        && data.risk is string
+        && data.risk.size() <= 16
+        && (data.risk == 'read' || data.risk == 'write' || data.risk == 'destructive')
+        && data.summary is string
+        && data.summary.size() >= 1
+        && data.summary.size() <= 600
+        && data.status is string
+        && data.status.size() <= 24
+        && (data.status == 'success' || data.status == 'paused_for_confirm' || data.status == 'executed' || data.status == 'rejected' || data.status == 'error')
+        && data.durationMs is number
+        && data.durationMs >= 0
+        && data.durationMs <= 600000
+        && data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isVerifiedOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().plan == 'free'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().plan == existing().plan
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName',
+          'dailyRequestsCount',
+          'dailyTokensUsed',
+          'lastResetDate',
+          'updatedAt'
+        ]);
+      allow delete: if isVerifiedOwner(userId) && isValidId(userId);
+
+      match /connections/{providerId} {
+        allow read, write: if false;
+      }
+
+      match /chats/{chatId} {
+        allow get: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(chatId)
+          && existing().uid == request.auth.uid
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow list: if isVerifiedOwner(userId)
+          && existing().uid == request.auth.uid;
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(chatId)
+          && isValidChatSession(incoming(), userId, chatId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(chatId)
+          && isValidChatSession(incoming(), userId, chatId)
+          && incoming().chatId == existing().chatId
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'title',
+            'modelId',
+            'updatedAt'
+          ])
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(chatId)
+          && existing().uid == request.auth.uid;
+
+        match /messages/{messageId} {
+          allow get: if isVerifiedOwner(userId)
+            && isValidId(userId)
+            && isValidId(chatId)
+            && isValidId(messageId)
+            && existing().uid == request.auth.uid
+            && exists(/databases/$(database)/documents/users/$(userId)/chats/$(chatId));
+          allow list: if isVerifiedOwner(userId)
+            && existing().uid == request.auth.uid;
+          allow create: if isVerifiedOwner(userId)
+            && isValidId(userId)
+            && isValidId(chatId)
+            && isValidId(messageId)
+            && isValidChatMessage(incoming(), userId, chatId, messageId)
+            && incoming().createdAt == request.time
+            && exists(/databases/$(database)/documents/users/$(userId)/chats/$(chatId));
+          allow update: if false;
+          allow delete: if isVerifiedOwner(userId)
+            && isValidId(userId)
+            && isValidId(chatId)
+            && isValidId(messageId)
+            && existing().uid == request.auth.uid;
+        }
+      }
+
+      match /pendingActions/{actionId} {
+        allow get: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(actionId)
+          && existing().uid == request.auth.uid
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow list: if isVerifiedOwner(userId)
+          && existing().uid == request.auth.uid;
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(actionId)
+          && isValidPendingAction(incoming(), userId, actionId)
+          && incoming().status == 'pending'
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId))
+          && exists(/databases/$(database)/documents/users/$(userId)/chats/$(incoming().chatId));
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(actionId)
+          && isValidPendingAction(incoming(), userId, actionId)
+          && existing().status == 'pending'
+          && (incoming().status == 'executed' || incoming().status == 'rejected' || incoming().status == 'expired')
+          && incoming().actionId == existing().actionId
+          && incoming().uid == existing().uid
+          && incoming().chatId == existing().chatId
+          && incoming().toolName == existing().toolName
+          && incoming().risk == existing().risk
+          && incoming().argsPreview == existing().argsPreview
+          && incoming().argsHash == existing().argsHash
+          && incoming().serverSignature == existing().serverSignature
+          && incoming().warningText == existing().warningText
+          && incoming().expiresAtMs == existing().expiresAtMs
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(actionId)
+          && existing().uid == request.auth.uid;
+      }
+
+      match /auditLog/{logId} {
+        allow get: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(logId)
+          && existing().uid == request.auth.uid
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow list: if isVerifiedOwner(userId)
+          && existing().uid == request.auth.uid;
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(logId)
+          && isValidAuditLogEntry(incoming(), userId, logId)
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if false;
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(logId)
+          && existing().uid == request.auth.uid;
+      }
+    }
+  }
+}

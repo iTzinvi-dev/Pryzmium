@@ -1,0 +1,6 @@
+{
+  "name": "Vektor Agent Workspace",
+  "description": "Multi-model autonomous AI agent workspace with Gmail, Google Calendar, and Google Drive connectors, human-in-the-loop write confirmations, and zero-trust audit logging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

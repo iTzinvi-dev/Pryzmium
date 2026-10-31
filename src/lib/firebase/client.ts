@@ -675,6 +675,7 @@ export async function emailPasswordSignIn(
 
       const res = await fetch('/api/auth/login', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, password })
       });
@@ -749,6 +750,7 @@ export async function emailPasswordSignUp(
 
       const res = await fetch('/api/auth/register', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: cleanEmail,
@@ -857,7 +859,7 @@ export async function logoutUser(): Promise<void> {
   cachedServerSessionToken = null;
   savePersistedServerSession(null, null);
   try {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
   } catch {
     return;
   }

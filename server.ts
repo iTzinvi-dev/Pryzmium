@@ -16,8 +16,15 @@ import {
   ModelProvider
 } from './src/lib/models/registry.ts';
 import {
+  buildClearSessionCookieHeader,
+  buildContentSecurityPolicyHeader,
+  buildSessionCookieHeader,
   createServerSessionToken,
-  verifyFirebaseIdTokenHeader
+  extractTrustedClientIp,
+  normalizeHostHeader,
+  RequestSecurityContext,
+  verifyFirebaseIdTokenHeader,
+  verifyRequestOriginAndContext
 } from './src/lib/security/auth-verify.ts';
 import {
   assertCryptoConfiguration,
@@ -96,12 +103,55 @@ interface SharedChatSnapshot {
 const sharedChatsStore = new Map<string, SharedChatSnapshot>();
 const MAX_STORE_ENTRIES = 1000;
 
-function extractClientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) {
-    return forwarded.split(',')[0].trim().slice(0, 64);
+export function extractClientIp(req: Request): string {
+  return extractTrustedClientIp({
+    socketRemoteAddress: req.socket?.remoteAddress,
+    forwardedForHeader: req.headers['x-forwarded-for']
+  });
+}
+
+function resolveRequestHost(req: Request): string {
+  const trustHops = Number.parseInt(process.env.TRUST_PROXY_HOPS || '0', 10);
+  if (Number.isFinite(trustHops) && trustHops >= 1 && trustHops <= 5) {
+    const forwardedHost = req.headers['x-forwarded-host'];
+    if (typeof forwardedHost === 'string' && forwardedHost.trim()) {
+      const normalized = normalizeHostHeader(forwardedHost);
+      if (normalized) {
+        return normalized;
+      }
+    }
   }
-  return (req.socket?.remoteAddress || 'local').slice(0, 64);
+  return normalizeHostHeader(req.headers.host);
+}
+
+function isRequestSecure(req: Request): boolean {
+  if (req.secure || process.env.NODE_ENV === 'production') {
+    return true;
+  }
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  if (typeof forwardedProto === 'string') {
+    return forwardedProto.split(',')[0].trim().toLowerCase() === 'https';
+  }
+  return false;
+}
+
+function buildRequestSecurityContext(req: Request): RequestSecurityContext {
+  return {
+    method: req.method,
+    originHeader:
+      typeof req.headers.origin === 'string' ? req.headers.origin : undefined,
+    refererHeader:
+      typeof req.headers.referer === 'string' ? req.headers.referer : undefined,
+    hostHeader: resolveRequestHost(req),
+    secFetchSiteHeader:
+      typeof req.headers['sec-fetch-site'] === 'string'
+        ? req.headers['sec-fetch-site']
+        : undefined,
+    userAgentHeader:
+      typeof req.headers['user-agent'] === 'string'
+        ? req.headers['user-agent']
+        : undefined
+  };
 }
 
 function getIdTokenHeader(req: Request): string | undefined {
@@ -319,12 +369,25 @@ app.use(express.json({ limit: '256kb' }));
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
-    res.setHeader(
-      'Content-Security-Policy',
-      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://accounts.google.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self';"
-    );
+    res.setHeader('Content-Security-Policy', buildContentSecurityPolicyHeader());
     if (req.path.startsWith('/api/')) {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      const method = req.method.toUpperCase();
+      if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+        const originCheck = verifyRequestOriginAndContext(buildRequestSecurityContext(req));
+        if (!originCheck.allowed) {
+          sendCustomError(
+            req,
+            res,
+            createForbiddenError(
+              originCheck.reason || 'Cross-origin state-changing request rejected.',
+              'FORBIDDEN_ORIGIN',
+              'Reload the workspace application from its primary origin and try again.'
+            )
+          );
+          return;
+        }
+      }
     }
     next();
   });
@@ -424,11 +487,16 @@ app.use(express.json({ limit: '256kb' }));
     const sessionToken = createServerSessionToken({
       uid,
       email: normalizedEmail,
-      displayName
+      displayName,
+      originHost: resolveRequestHost(req),
+      userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined
     });
     res.setHeader(
       'Set-Cookie',
-      `vektor_session=${encodeURIComponent(sessionToken)}; Path=/; Max-Age=${7 * 24 * 3600}; HttpOnly; SameSite=None; Secure`
+      buildSessionCookieHeader(sessionToken, {
+        maxAgeSec: 7 * 24 * 3600,
+        isSecure: isRequestSecure(req)
+      })
     );
 
     res.json({
@@ -499,12 +567,17 @@ app.use(express.json({ limit: '256kb' }));
     const sessionToken = createServerSessionToken({
       uid: existing.uid,
       email: existing.email,
-      displayName: existing.displayName
+      displayName: existing.displayName,
+      originHost: resolveRequestHost(req),
+      userAgent: typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : undefined
     });
 
     res.setHeader(
       'Set-Cookie',
-      `vektor_session=${encodeURIComponent(sessionToken)}; Path=/; Max-Age=${7 * 24 * 3600}; HttpOnly; SameSite=None; Secure`
+      buildSessionCookieHeader(sessionToken, {
+        maxAgeSec: 7 * 24 * 3600,
+        isSecure: isRequestSecure(req)
+      })
     );
 
     res.json({
@@ -526,7 +599,7 @@ app.use(express.json({ limit: '256kb' }));
     }
     res.setHeader(
       'Set-Cookie',
-      'vektor_session=; Path=/; Max-Age=0; HttpOnly; SameSite=None; Secure'
+      buildClearSessionCookieHeader({ isSecure: isRequestSecure(req) })
     );
     res.json({ ok: true });
   });
@@ -552,7 +625,8 @@ app.use(express.json({ limit: '256kb' }));
     const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
       cookieHeader: req.headers.cookie,
-      expectedUid: uid || email
+      expectedUid: uid || email,
+      requestContext: buildRequestSecurityContext(req)
     });
     if (!verified.valid) {
       sendCustomError(
@@ -596,7 +670,8 @@ app.use(express.json({ limit: '256kb' }));
     const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
       cookieHeader: req.headers.cookie,
-      expectedUid: uid || email
+      expectedUid: uid || email,
+      requestContext: buildRequestSecurityContext(req)
     });
     if (!verified.valid) {
       sendCustomError(
@@ -636,7 +711,8 @@ app.use(express.json({ limit: '256kb' }));
     const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
       cookieHeader: req.headers.cookie,
-      expectedUid: uid
+      expectedUid: uid,
+      requestContext: buildRequestSecurityContext(req)
     });
     if (!verified.valid || !verified.uid) {
       sendCustomError(
@@ -692,7 +768,8 @@ app.use(express.json({ limit: '256kb' }));
     const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
       cookieHeader: req.headers.cookie,
-      expectedUid: uid
+      expectedUid: uid,
+      requestContext: buildRequestSecurityContext(req)
     });
     if (!verified.valid || !verified.uid) {
       sendCustomError(
@@ -722,7 +799,8 @@ app.use(express.json({ limit: '256kb' }));
 
     const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
-      cookieHeader: req.headers.cookie
+      cookieHeader: req.headers.cookie,
+      requestContext: buildRequestSecurityContext(req)
     });
     if (!verified.valid || !verified.uid) {
       sendCustomError(
@@ -835,7 +913,8 @@ app.use(express.json({ limit: '256kb' }));
       const idCheck = await verifyFirebaseIdTokenHeader({
         idTokenHeader: getIdTokenHeader(req),
         cookieHeader: req.headers.cookie,
-        expectedUid: uid
+        expectedUid: uid,
+        requestContext: buildRequestSecurityContext(req)
       });
       if (!idCheck.valid) {
         sendCustomError(
@@ -950,7 +1029,8 @@ app.use(express.json({ limit: '256kb' }));
       const idCheck = await verifyFirebaseIdTokenHeader({
         idTokenHeader: getIdTokenHeader(req),
         cookieHeader: req.headers.cookie,
-        expectedUid: uid
+        expectedUid: uid,
+        requestContext: buildRequestSecurityContext(req)
       });
       if (!idCheck.valid) {
         sendCustomError(
@@ -1154,7 +1234,8 @@ app.use(express.json({ limit: '256kb' }));
       const idCheck = await verifyFirebaseIdTokenHeader({
         idTokenHeader: getIdTokenHeader(req),
         cookieHeader: req.headers.cookie,
-        expectedUid: uid
+        expectedUid: uid,
+        requestContext: buildRequestSecurityContext(req)
       });
       if (!idCheck.valid) {
         sendCustomError(
@@ -1351,7 +1432,8 @@ app.use(express.json({ limit: '256kb' }));
     const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
       cookieHeader: req.headers.cookie,
-      expectedUid: parsed.data.uid
+      expectedUid: parsed.data.uid,
+      requestContext: buildRequestSecurityContext(req)
     });
     if (!verified.valid) {
       sendCustomError(

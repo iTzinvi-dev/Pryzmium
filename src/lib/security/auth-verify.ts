@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import fs from 'fs';
+import net from 'node:net';
 import path from 'path';
 import { getEncryptionKey } from './crypto.ts';
 
@@ -47,6 +48,311 @@ export function resolveExpectedFirebaseProjectId(): string {
   );
 }
 
+export interface RequestSecurityContext {
+  method?: string;
+  originHeader?: string | undefined;
+  refererHeader?: string | undefined;
+  hostHeader?: string | undefined;
+  secFetchSiteHeader?: string | undefined;
+  userAgentHeader?: string | undefined;
+}
+
+export interface OriginVerificationResult {
+  allowed: boolean;
+  reason?: string;
+}
+
+function normalizeIpAddress(rawIp: string | undefined): string {
+  if (!rawIp || typeof rawIp !== 'string') {
+    return '';
+  }
+  const trimmed = rawIp.trim();
+  if (!trimmed) {
+    return '';
+  }
+  const withoutZone = trimmed.includes('%') ? trimmed.split('%')[0] : trimmed;
+  if (withoutZone.toLowerCase().startsWith('::ffff:')) {
+    const mappedIpv4 = withoutZone.slice(7);
+    if (net.isIP(mappedIpv4) === 4) {
+      return mappedIpv4;
+    }
+  }
+  return net.isIP(withoutZone) !== 0 ? withoutZone : '';
+}
+
+function isTrustedProxyPeer(ip: string): boolean {
+  if (!ip) {
+    return false;
+  }
+  if (ip === '127.0.0.1' || ip === '::1') {
+    return true;
+  }
+  if (net.isIP(ip) === 4) {
+    const octets = ip.split('.').map((part) => Number.parseInt(part, 10));
+    if (octets.length !== 4 || octets.some((n) => !Number.isFinite(n))) {
+      return false;
+    }
+    if (octets[0] === 10 || octets[0] === 127) {
+      return true;
+    }
+    if (octets[0] === 192 && octets[1] === 168) {
+      return true;
+    }
+    if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) {
+      return true;
+    }
+    if (octets[0] === 169 && octets[1] === 254) {
+      return true;
+    }
+    return false;
+  }
+  const lower = ip.toLowerCase();
+  return lower.startsWith('fc') || lower.startsWith('fd') || lower.startsWith('fe80:');
+}
+
+export function extractTrustedClientIp(params: {
+  socketRemoteAddress?: string | undefined;
+  forwardedForHeader?: string | string[] | undefined;
+  trustProxyHops?: number;
+}): string {
+  const socketIp = normalizeIpAddress(params.socketRemoteAddress);
+  const configuredHops =
+    typeof params.trustProxyHops === 'number'
+      ? Math.floor(params.trustProxyHops)
+      : Number.parseInt(process.env.TRUST_PROXY_HOPS || '0', 10);
+
+  if (
+    Number.isFinite(configuredHops) &&
+    configuredHops >= 1 &&
+    configuredHops <= 5 &&
+    isTrustedProxyPeer(socketIp)
+  ) {
+    const rawForwarded = Array.isArray(params.forwardedForHeader)
+      ? params.forwardedForHeader.join(',')
+      : params.forwardedForHeader;
+
+    if (typeof rawForwarded === 'string' && rawForwarded.trim()) {
+      const chain = rawForwarded
+        .split(',')
+        .map((entry) => normalizeIpAddress(entry))
+        .filter(Boolean);
+
+      if (chain.length > 0) {
+        const targetIndex = Math.max(0, chain.length - configuredHops);
+        const candidate = chain[targetIndex];
+        if (candidate) {
+          return candidate.slice(0, 64);
+        }
+      }
+    }
+  }
+
+  return (socketIp || 'local').slice(0, 64);
+}
+
+export function normalizeHostHeader(rawHost: string | undefined): string {
+  if (!rawHost || typeof rawHost !== 'string') {
+    return '';
+  }
+  const firstHost = rawHost.split(',')[0].trim().toLowerCase();
+  if (!firstHost || !/^[a-z0-9.-]+(?::\d{1,5})?$/.test(firstHost)) {
+    return '';
+  }
+  return firstHost;
+}
+
+function extractHostFromUrlHeader(rawUrl: string | undefined): string | null {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return null;
+  }
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (trimmed.toLowerCase() === 'null') {
+    return 'null';
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return 'null';
+    }
+    return parsed.host.toLowerCase();
+  } catch {
+    return 'null';
+  }
+}
+
+function getAllowedHostsSet(hostHeader: string | undefined): Set<string> {
+  const allowed = new Set<string>();
+  const primaryHost = normalizeHostHeader(hostHeader);
+  if (primaryHost) {
+    allowed.add(primaryHost);
+  }
+  const envOrigins = (process.env.ALLOWED_ORIGINS || '').trim();
+  if (envOrigins) {
+    for (const item of envOrigins.split(',')) {
+      const trimmed = item.trim();
+      if (!trimmed) continue;
+      const parsedHost = extractHostFromUrlHeader(trimmed);
+      if (parsedHost && parsedHost !== 'null') {
+        allowed.add(parsedHost);
+      } else {
+        const normalized = normalizeHostHeader(trimmed);
+        if (normalized) {
+          allowed.add(normalized);
+        }
+      }
+    }
+  }
+  return allowed;
+}
+
+function computeUserAgentHash(userAgent: string | undefined): string {
+  if (!userAgent || typeof userAgent !== 'string') {
+    return '';
+  }
+  const trimmed = userAgent.trim();
+  if (!trimmed) {
+    return '';
+  }
+  return crypto.createHash('sha256').update(trimmed, 'utf8').digest('hex').slice(0, 32);
+}
+
+export function verifyRequestOriginAndContext(
+  context: RequestSecurityContext,
+  options?: { requireSameOriginProof?: boolean }
+): OriginVerificationResult {
+  const method = (context.method || 'GET').toUpperCase();
+  const isStateChanging =
+    method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+  const allowedHosts = getAllowedHostsSet(context.hostHeader);
+
+  const originHost = extractHostFromUrlHeader(context.originHeader);
+  if (originHost !== null) {
+    if (originHost === 'null') {
+      return {
+        allowed: false,
+        reason: 'Requests with an opaque or null Origin header are not permitted.'
+      };
+    }
+    if (allowedHosts.size > 0 && !allowedHosts.has(originHost)) {
+      return {
+        allowed: false,
+        reason: 'Request Origin header does not match the authorized application host.'
+      };
+    }
+  }
+
+  const refererHost = extractHostFromUrlHeader(context.refererHeader);
+  if (refererHost !== null) {
+    if (refererHost === 'null') {
+      return {
+        allowed: false,
+        reason: 'Request Referer header is malformed or uses an unsupported scheme.'
+      };
+    }
+    if (allowedHosts.size > 0 && !allowedHosts.has(refererHost)) {
+      return {
+        allowed: false,
+        reason: 'Request Referer header does not match the authorized application host.'
+      };
+    }
+  }
+
+  const secFetchSite =
+    typeof context.secFetchSiteHeader === 'string'
+      ? context.secFetchSiteHeader.trim().toLowerCase()
+      : '';
+
+  const hasMatchingOrigin =
+    originHost !== null &&
+    originHost !== 'null' &&
+    allowedHosts.size > 0 &&
+    allowedHosts.has(originHost);
+
+  const hasMatchingReferer =
+    refererHost !== null &&
+    refererHost !== 'null' &&
+    allowedHosts.size > 0 &&
+    allowedHosts.has(refererHost);
+
+  if (secFetchSite === 'cross-site' && !hasMatchingOrigin) {
+    return {
+      allowed: false,
+      reason: 'Cross-site request blocked by Fetch Metadata policy.'
+    };
+  }
+
+  if (options?.requireSameOriginProof && isStateChanging) {
+    const hasSameOriginFetchSite = secFetchSite === 'same-origin';
+    if (!hasMatchingOrigin && !hasMatchingReferer && !hasSameOriginFetchSite) {
+      return {
+        allowed: false,
+        reason:
+          'Cookie-authenticated state-changing request requires same-origin Origin or Referer verification.'
+      };
+    }
+  }
+
+  return { allowed: true };
+}
+
+export function buildSessionCookieHeader(
+  sessionToken: string,
+  options?: { maxAgeSec?: number; isSecure?: boolean }
+): string {
+  const maxAge =
+    typeof options?.maxAgeSec === 'number' && Number.isFinite(options.maxAgeSec)
+      ? Math.max(0, Math.floor(options.maxAgeSec))
+      : 7 * 24 * 3600;
+  const isSecure =
+    typeof options?.isSecure === 'boolean'
+      ? options.isSecure
+      : process.env.NODE_ENV === 'production';
+
+  const parts = [
+    `vektor_session=${encodeURIComponent(sessionToken)}`,
+    'Path=/',
+    `Max-Age=${maxAge}`,
+    'HttpOnly',
+    'SameSite=Lax'
+  ];
+  if (isSecure) {
+    parts.push('Secure');
+  }
+  return parts.join('; ');
+}
+
+export function buildClearSessionCookieHeader(options?: { isSecure?: boolean }): string {
+  const isSecure =
+    typeof options?.isSecure === 'boolean'
+      ? options.isSecure
+      : process.env.NODE_ENV === 'production';
+
+  const parts = ['vektor_session=', 'Path=/', 'Max-Age=0', 'HttpOnly', 'SameSite=Lax'];
+  if (isSecure) {
+    parts.push('Secure');
+  }
+  return parts.join('; ');
+}
+
+export function buildContentSecurityPolicyHeader(): string {
+  return [
+    "default-src 'self'",
+    "script-src 'self' https://apis.google.com https://accounts.google.com",
+    "script-src-attr 'none'",
+    "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
+    "img-src 'self' data: https:",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.cdnfonts.com",
+    "font-src 'self' data: https://fonts.gstatic.com https://fonts.cdnfonts.com",
+    "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'"
+  ].join('; ');
+}
+
 interface DecodedJwtHeader {
   alg?: string;
   kid?: string;
@@ -69,6 +375,8 @@ export interface ServerSessionPayload {
   email: string;
   displayName: string;
   projectId: string;
+  originHost?: string;
+  uaHash?: string;
   iat: number;
   exp: number;
 }
@@ -153,6 +461,8 @@ export function createServerSessionToken(params: {
   email: string;
   displayName: string;
   ttlSeconds?: number;
+  originHost?: string;
+  userAgent?: string;
 }): string {
   const nowSec = Math.floor(Date.now() / 1000);
   const ttl =
@@ -160,11 +470,16 @@ export function createServerSessionToken(params: {
       ? Math.floor(params.ttlSeconds)
       : 7 * 24 * 3600;
 
+  const normalizedOriginHost = normalizeHostHeader(params.originHost);
+  const uaHash = computeUserAgentHash(params.userAgent);
+
   const payload: ServerSessionPayload = {
     uid: params.uid.trim(),
     email: params.email.trim().toLowerCase(),
     displayName: params.displayName.trim(),
     projectId: resolveExpectedFirebaseProjectId(),
+    ...(normalizedOriginHost ? { originHost: normalizedOriginHost } : {}),
+    ...(uaHash ? { uaHash } : {}),
     iat: nowSec,
     exp: nowSec + ttl
   };
@@ -180,7 +495,8 @@ export function createServerSessionToken(params: {
 
 function verifyServerSessionToken(
   token: string,
-  cleanExpectedUid: string
+  cleanExpectedUid: string,
+  requestContext?: RequestSecurityContext
 ): TokenVerificationResult {
   const parts = token.split('.');
   if (parts.length !== 3 || parts[0] !== 'vkt1') {
@@ -223,6 +539,26 @@ function verifyServerSessionToken(
   const expectedProjectId = resolveExpectedFirebaseProjectId();
   if (payload.projectId && payload.projectId !== expectedProjectId) {
     return { valid: false, reason: 'Server session token project binding mismatch.' };
+  }
+
+  if (payload.originHost && requestContext?.hostHeader) {
+    const currentHost = normalizeHostHeader(requestContext.hostHeader);
+    if (currentHost && currentHost !== payload.originHost) {
+      return {
+        valid: false,
+        reason: 'Server session token host binding does not match request host.'
+      };
+    }
+  }
+
+  if (payload.uaHash && requestContext?.userAgentHeader) {
+    const currentUaHash = computeUserAgentHash(requestContext.userAgentHeader);
+    if (currentUaHash && currentUaHash !== payload.uaHash) {
+      return {
+        valid: false,
+        reason: 'Server session token client context (User-Agent) mismatch.'
+      };
+    }
   }
 
   const tokenUid = payload.uid.trim();
@@ -358,8 +694,9 @@ export async function verifyFirebaseIdTokenHeader(params: {
   idTokenHeader: string | undefined;
   cookieHeader?: string | undefined;
   expectedUid?: string;
+  requestContext?: RequestSecurityContext;
 }): Promise<TokenVerificationResult> {
-  const { idTokenHeader, cookieHeader, expectedUid } = params;
+  const { idTokenHeader, cookieHeader, expectedUid, requestContext } = params;
   const cleanExpectedUid = typeof expectedUid === 'string' ? expectedUid.trim() : '';
 
   if (cleanExpectedUid !== '') {
@@ -371,12 +708,15 @@ export async function verifyFirebaseIdTokenHeader(params: {
     }
   }
 
-  let effectiveToken =
+  const explicitHeaderToken =
     idTokenHeader && typeof idTokenHeader === 'string' ? idTokenHeader.trim() : '';
+  let effectiveToken = explicitHeaderToken;
+  let usingCookieFallback = false;
 
   if (!effectiveToken && cookieHeader && typeof cookieHeader === 'string') {
     const match = cookieHeader.match(/(?:^|;\s*)vektor_session=([^;]+)/);
     if (match && match[1]) {
+      usingCookieFallback = true;
       try {
         effectiveToken = decodeURIComponent(match[1].trim());
       } catch {
@@ -389,10 +729,23 @@ export async function verifyFirebaseIdTokenHeader(params: {
     return { valid: false, reason: 'Missing authentication token or session cookie.' };
   }
 
+  if (requestContext) {
+    const originCheck = verifyRequestOriginAndContext(requestContext, {
+      requireSameOriginProof: usingCookieFallback
+    });
+    if (!originCheck.allowed) {
+      return {
+        valid: false,
+        reason: originCheck.reason || 'Request origin or browser context verification failed.'
+      };
+    }
+  }
+
   if (effectiveToken.startsWith('vkt1.')) {
-    return verifyServerSessionToken(effectiveToken, cleanExpectedUid);
+    return verifyServerSessionToken(effectiveToken, cleanExpectedUid, requestContext);
   }
 
   return verifyFirebaseJwtToken(effectiveToken, cleanExpectedUid);
 }
+
 

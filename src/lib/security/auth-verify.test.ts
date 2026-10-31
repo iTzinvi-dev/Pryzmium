@@ -2,11 +2,16 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import test from 'node:test';
 import {
+  buildClearSessionCookieHeader,
+  buildContentSecurityPolicyHeader,
+  buildSessionCookieHeader,
   clearFirebasePublicKeysForTest,
   createServerSessionToken,
+  extractTrustedClientIp,
   registerFirebasePublicKeyForTest,
   resolveExpectedFirebaseProjectId,
-  verifyFirebaseIdTokenHeader
+  verifyFirebaseIdTokenHeader,
+  verifyRequestOriginAndContext
 } from './auth-verify.ts';
 import {
   assertCryptoConfiguration,
@@ -223,3 +228,139 @@ test('getEncryptionKey() unconditionally throws if TOKEN_ENCRYPTION_KEY is undef
     }
   }
 });
+
+test('extractTrustedClientIp ignores spoofed X-Forwarded-For by default and uses right-most hop when trusted proxy is configured', () => {
+  const directUntrusted = extractTrustedClientIp({
+    socketRemoteAddress: '::ffff:198.51.100.42',
+    forwardedForHeader: '203.0.113.1, 203.0.113.2',
+    trustProxyHops: 0
+  });
+  assert.equal(directUntrusted, '198.51.100.42');
+
+  const spoofedFromPublicPeerEvenWithHops = extractTrustedClientIp({
+    socketRemoteAddress: '198.51.100.42',
+    forwardedForHeader: '203.0.113.99',
+    trustProxyHops: 1
+  });
+  assert.equal(spoofedFromPublicPeerEvenWithHops, '198.51.100.42');
+
+  const behindTrustedProxyWithSpoofedPrefix = extractTrustedClientIp({
+    socketRemoteAddress: '10.0.0.5',
+    forwardedForHeader: '1.2.3.4, 198.51.100.77',
+    trustProxyHops: 1
+  });
+  assert.equal(behindTrustedProxyWithSpoofedPrefix, '198.51.100.77');
+});
+
+test('session cookies use SameSite=Lax and HttpOnly instead of SameSite=None', () => {
+  const sessionCookie = buildSessionCookieHeader('vkt1.test.sig', {
+    maxAgeSec: 3600,
+    isSecure: true
+  });
+  assert.match(sessionCookie, /HttpOnly/);
+  assert.match(sessionCookie, /SameSite=Lax/);
+  assert.doesNotMatch(sessionCookie, /SameSite=None/i);
+
+  const clearCookie = buildClearSessionCookieHeader({ isSecure: true });
+  assert.match(clearCookie, /Max-Age=0/);
+  assert.match(clearCookie, /SameSite=Lax/);
+  assert.doesNotMatch(clearCookie, /SameSite=None/i);
+});
+
+test('Content-Security-Policy header removes unsafe-inline and unsafe-eval from script-src', () => {
+  const csp = buildContentSecurityPolicyHeader();
+  const scriptSrcDirective = csp
+    .split(';')
+    .map((d) => d.trim())
+    .find((d) => d.startsWith('script-src '));
+
+  assert.ok(scriptSrcDirective, 'script-src directive must be present');
+  assert.doesNotMatch(scriptSrcDirective, /'unsafe-inline'/);
+  assert.doesNotMatch(scriptSrcDirective, /'unsafe-eval'/);
+  assert.match(csp, /script-src-attr 'none'/);
+  assert.match(csp, /form-action 'self'/);
+});
+
+test('enforces CSRF Origin/Referer validation and binds server session tokens to host and User-Agent', async () => {
+  process.env.TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
+
+  const crossOriginCheck = verifyRequestOriginAndContext({
+    method: 'POST',
+    hostHeader: 'app.pryzmium.dev',
+    originHeader: 'https://evil-attacker.example',
+    secFetchSiteHeader: 'cross-site'
+  });
+  assert.equal(crossOriginCheck.allowed, false);
+
+  const boundToken = createServerSessionToken({
+    uid: 'usr_bound_01',
+    email: 'bound@example.com',
+    displayName: 'Bound User',
+    originHost: 'app.pryzmium.dev',
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+  });
+
+  const cookieWithoutOriginOnPost = await verifyFirebaseIdTokenHeader({
+    idTokenHeader: undefined,
+    cookieHeader: `vektor_session=${encodeURIComponent(boundToken)}`,
+    expectedUid: 'usr_bound_01',
+    requestContext: {
+      method: 'POST',
+      hostHeader: 'app.pryzmium.dev'
+    }
+  });
+  assert.equal(cookieWithoutOriginOnPost.valid, false);
+
+  const cookieFromEvilOrigin = await verifyFirebaseIdTokenHeader({
+    idTokenHeader: undefined,
+    cookieHeader: `vektor_session=${encodeURIComponent(boundToken)}`,
+    expectedUid: 'usr_bound_01',
+    requestContext: {
+      method: 'POST',
+      hostHeader: 'app.pryzmium.dev',
+      originHeader: 'https://evil.example',
+      secFetchSiteHeader: 'cross-site'
+    }
+  });
+  assert.equal(cookieFromEvilOrigin.valid, false);
+
+  const wrongHostReplay = await verifyFirebaseIdTokenHeader({
+    idTokenHeader: boundToken,
+    expectedUid: 'usr_bound_01',
+    requestContext: {
+      method: 'POST',
+      hostHeader: 'other-host.example.com',
+      originHeader: 'https://other-host.example.com',
+      userAgentHeader: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+    }
+  });
+  assert.equal(wrongHostReplay.valid, false);
+
+  const wrongUserAgentReplay = await verifyFirebaseIdTokenHeader({
+    idTokenHeader: boundToken,
+    expectedUid: 'usr_bound_01',
+    requestContext: {
+      method: 'POST',
+      hostHeader: 'app.pryzmium.dev',
+      originHeader: 'https://app.pryzmium.dev',
+      userAgentHeader: 'curl/8.5.0'
+    }
+  });
+  assert.equal(wrongUserAgentReplay.valid, false);
+
+  const validSameOriginRequest = await verifyFirebaseIdTokenHeader({
+    idTokenHeader: undefined,
+    cookieHeader: `vektor_session=${encodeURIComponent(boundToken)}`,
+    expectedUid: 'usr_bound_01',
+    requestContext: {
+      method: 'POST',
+      hostHeader: 'app.pryzmium.dev',
+      originHeader: 'https://app.pryzmium.dev',
+      secFetchSiteHeader: 'same-origin',
+      userAgentHeader: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+    }
+  });
+  assert.equal(validSameOriginRequest.valid, true);
+  assert.equal(validSameOriginRequest.uid, 'usr_bound_01');
+});
+

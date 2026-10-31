@@ -87,6 +87,30 @@ export const MODEL_ALLOWLIST: ModelRegistryEntry[] = [
     description: 'Flagship 550B MoE reasoning, math & complex problem solving'
   },
   {
+    id: 'openrouter/poolside/laguna-s-2.1:free',
+    label: 'Poolside Laguna S 2.1 (Free)',
+    provider: 'openrouter',
+    providerModelName: 'poolside/laguna-s-2.1:free',
+    supportsTools: true,
+    costTier: 'free',
+    contextWindow: '128K',
+    bestFor: '2026 Frontier code synthesis, full-stack architecture & deep debugging',
+    dailyLimit24h: 25,
+    description: '2026 Frontier code synthesis, full-stack architecture & deep debugging'
+  },
+  {
+    id: 'openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+    label: 'Nemotron 3 Nano Omni Reasoning (Free)',
+    provider: 'openrouter',
+    providerModelName: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+    supportsTools: true,
+    costTier: 'free',
+    contextWindow: '128K',
+    bestFor: '2026 Chain-of-thought reasoning, algorithmic logic & coding verification',
+    dailyLimit24h: 25,
+    description: '2026 Chain-of-thought reasoning, algorithmic logic & coding verification'
+  },
+  {
     id: 'openrouter/cohere/north-mini-code:free',
     label: 'Cohere North Mini Code (Free)',
     provider: 'openrouter',
@@ -138,13 +162,13 @@ export const MODEL_ALLOWLIST: ModelRegistryEntry[] = [
     id: 'openrouter/qwen/qwen-2.5-coder-32b-instruct:free',
     label: 'Qwen 2.5 Coder 32B',
     provider: 'openrouter',
-    providerModelName: 'cohere/north-mini-code:free',
+    providerModelName: 'nvidia/nemotron-3-ultra-550b-a55b:free',
     supportsTools: true,
     costTier: 'free',
     contextWindow: '128K',
-    bestFor: 'Software engineering, debugging & system architecture',
+    bestFor: 'Frontier software engineering, debugging & system architecture',
     dailyLimit24h: 25,
-    description: 'Software engineering, debugging & system architecture'
+    description: 'Frontier software engineering, debugging & system architecture'
   },
   {
     id: 'openrouter/meta-llama/llama-3.3-70b-instruct:free',
@@ -893,10 +917,13 @@ const LEGACY_PROVIDER_MODEL_ALIASES: Record<string, string> = {
   'whisper-large-v3-turbo': 'openai/gpt-oss-20b',
   'meta-llama/llama-3.1-405b-instruct:free': 'nvidia/nemotron-3-ultra-550b-a55b:free',
   'qwen/qwen-2.5-coder-32b-instruct:free': 'nvidia/nemotron-3-ultra-550b-a55b:free',
-  'meta-llama/llama-3.3-70b-instruct:free': 'openrouter/free',
+  'meta-llama/llama-3.3-70b-instruct:free': 'nvidia/nemotron-3-ultra-550b-a55b:free',
   'mistralai/mistral-7b-instruct:free': 'liquid/lfm-2.5-2.6b:free',
   'meta-llama/llama-3.2-11b-vision-instruct:free': 'nvidia/nemotron-3.5-super-vl:free',
-  'minimax/minimax-m3.1-flash': 'mistralai/ministral-14b'
+  'minimax/minimax-m3.1-flash': 'mistralai/ministral-14b',
+  'qwen/qwen3-coder-plus:free': 'mistralai/devstral-medium',
+  'qwen/qwen3.8-max:free': 'mistralai/mistral-large-2512',
+  'qwen/qwen3.6-35b-a3b:free': 'mistralai/codestral-2508'
 };
 
 export function normalizeProviderModelSlug(provider: ModelProvider, rawModelName: string): string {
@@ -1304,18 +1331,19 @@ function getProviderModelCandidates(
     fallbacks = isCodingTask
       ? [
           normalizedRequested,
-          'mistralai/codestral-2508',
-          'qwen/qwen3-coder-plus:free',
           'mistralai/devstral-medium',
-          'qwen/qwen3.8-max:free',
+          'mistralai/codestral-2508',
           'mistralai/mistral-large-2512',
-          'qwen/qwen3.6-35b-a3b:free',
-          'qwen/qwen3.7-flash:free'
+          'cohere/north-mini-code',
+          'qwen/qwen3.7-max:free',
+          'cohere/command-a-reasoning',
+          'mistralai/mistral-medium-3.5'
         ]
       : [
           normalizedRequested,
           'mistralai/mistral-large-2512',
-          'qwen/qwen3.8-max:free',
+          'mistralai/mistral-medium-3.5',
+          'qwen/qwen3.7-max:free',
           'mistralai/ministral-14b',
           'qwen/qwen3.7-flash:free'
         ];
@@ -1338,17 +1366,19 @@ function getProviderModelCandidates(
       ? [
           normalizedRequested,
           'nvidia/nemotron-3-ultra-550b-a55b:free',
+          'poolside/laguna-s-2.1:free',
           'cohere/north-mini-code:free',
-          'openrouter/free',
-          'nvidia/nemotron-3.5-super-vl:free'
+          'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+          'openrouter/free'
         ]
       : [
           normalizedRequested,
           'nvidia/nemotron-3-ultra-550b-a55b:free',
+          'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+          'poolside/laguna-s-2.1:free',
           'cohere/north-mini-code:free',
           'nvidia/nemotron-3.5-super-vl:free',
-          'openrouter/free',
-          'liquid/lfm-2.5-2.6b:free'
+          'openrouter/free'
         ];
   } else {
     fallbacks = [normalizedRequested];
@@ -1573,13 +1603,13 @@ function normalizeGeminiContents(messages: AgentConversationMessage[]) {
 
 function resolveRealGeminiApiModelName(rawModelName: string): string {
   const cleaned = (rawModelName || '').trim();
-  if (cleaned === 'gemini-3.8-flash') {
-    return 'gemini-3-flash-preview';
+  if (cleaned === 'gemini-3-flash-preview') {
+    return 'gemini-3.8-flash';
   }
-  if (cleaned === 'gemini-3.1-flash-lite') {
-    return 'gemini-3.1-flash-lite-preview';
+  if (cleaned === 'gemini-3.1-flash-lite-preview') {
+    return 'gemini-3.1-flash-lite';
   }
-  return cleaned || 'gemini-3-flash-preview';
+  return cleaned || 'gemini-3.8-flash';
 }
 
 async function callSingleGeminiModelWithTimeout(params: {
@@ -1602,7 +1632,7 @@ async function callSingleGeminiModelWithTimeout(params: {
       ? [{ functionDeclarations: params.functionDeclarations }]
       : undefined;
 
-  const timeoutMs = params.timeoutMs || (params.isCodingTask ? 24_000 : 15_000);
+  const timeoutMs = params.timeoutMs || (params.isCodingTask ? 14_000 : 10_000);
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
   const response = await Promise.race([
@@ -1611,9 +1641,6 @@ async function callSingleGeminiModelWithTimeout(params: {
       contents,
       config: {
         systemInstruction: params.systemInstruction,
-        temperature: params.isCodingTask ? 0.15 : 0.35,
-        topP: params.isCodingTask ? 0.92 : 0.95,
-        maxOutputTokens: 8192,
         ...(toolsConfig ? { tools: toolsConfig } : {})
       }
     }),
@@ -1642,11 +1669,13 @@ async function callSingleGeminiModelWithTimeout(params: {
   }
 
   const candidateParts = response.candidates?.[0]?.content?.parts || [];
-  const rawExtractedText = candidateParts
-    .map((part) => (typeof part.text === 'string' ? part.text : ''))
-    .filter(Boolean)
-    .join('\n')
-    .trim();
+  const rawExtractedText = (
+    response.text ||
+    candidateParts
+      .map((part) => (typeof part.text === 'string' ? part.text : ''))
+      .filter(Boolean)
+      .join('\n')
+  ).trim();
   const extractedText = params.isCodingTask
     ? sanitizeGeneratedCodeResponse(rawExtractedText)
     : rawExtractedText;
@@ -1679,30 +1708,18 @@ async function callGeminiAdapter(params: {
   const now = Date.now();
   const primaryModel = resolveRealGeminiApiModelName(params.modelName);
   const baseCandidates = Array.from(
-    new Set(
-      params.isCodingTask
-        ? [
-            primaryModel,
-            'gemini-3-flash-preview',
-            'gemini-3.1-pro-preview',
-            'gemini-2.5-pro',
-            'gemini-2.5-flash',
-            'gemini-flash-latest'
-          ]
-        : [
-            primaryModel,
-            'gemini-3-flash-preview',
-            'gemini-2.5-flash',
-            'gemini-flash-latest',
-            'gemini-3.1-flash-lite-preview'
-          ]
-    )
+    new Set([
+      'gemini-3.1-flash-lite',
+      primaryModel,
+      'gemini-3.8-flash',
+      'gemini-flash-latest'
+    ])
   );
 
   const availableFirst = baseCandidates.filter((m) => (modelBusyCooldownUntil.get(m) || 0) <= now);
   const coolingDown = baseCandidates.filter((m) => (modelBusyCooldownUntil.get(m) || 0) > now);
   const orderedCandidates = [...availableFirst, ...coolingDown];
-  const candidateTimeoutMs = params.isCodingTask ? 22_000 : 12_000;
+  const candidateTimeoutMs = params.isCodingTask ? 14_000 : 9_000;
 
   let lastError: unknown = null;
   for (const candidateModel of orderedCandidates) {
@@ -1721,7 +1738,7 @@ async function callGeminiAdapter(params: {
   }
 
   if (params.supportsTools && params.functionDeclarations.length > 0) {
-    for (const fallbackModel of ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-flash-latest']) {
+    for (const fallbackModel of ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest']) {
       try {
         return await callSingleGeminiModelWithTimeout({
           ...params,
@@ -1774,7 +1791,7 @@ export async function invokeModelWithFallback(params: {
   );
   const roleContext = `\nActive Selected Model Profile: ${entry.label}. Specialty: ${entry.bestFor}. ${
     isCoding
-      ? 'Operate in Frontier Principal Software Engineer mode: deliver complete, production-ready, deeply architected, zero-placeholder code with strict type safety and optimal complexity.'
+      ? 'Operate in 2026 Frontier Principal Software Engineer mode: deliver complete, production-ready, deeply architected, zero-placeholder code with strict type safety and optimal complexity.'
       : 'Tailor your reasoning depth, coding precision, or response speed to match this profile.'
   }`;
   const enrichedSystemInstruction = `${params.systemInstruction}${roleContext}`;
@@ -1816,7 +1833,7 @@ export async function invokeModelWithFallback(params: {
   }
 
   const res = await callGeminiAdapter({
-    modelName: isCoding ? 'gemini-3-flash-preview' : 'gemini-3.1-flash-lite-preview',
+    modelName: 'gemini-3.1-flash-lite',
     usedModelId: entry.id,
     supportsTools: entry.supportsTools,
     systemInstruction: enrichedSystemInstruction,

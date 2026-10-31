@@ -28,6 +28,8 @@ export function classifyModelPurpose(model: ModelInfo): ModelPurpose {
     idLower.includes('codestral') ||
     idLower.includes('devstral') ||
     idLower.includes('mini-code') ||
+    idLower.includes('laguna') ||
+    idLower.includes('poolside') ||
     idLower.includes('deepseek-r1-distill-qwen-32b') ||
     idLower.includes('qwen3.6-35b-a3b')
   ) {
@@ -47,8 +49,10 @@ export function classifyModelPurpose(model: ModelInfo): ModelPurpose {
   if (
     idLower.includes('reasoning') ||
     idLower.includes('deepseek-r1') ||
+    idLower.includes('550b') ||
     idLower.includes('405b') ||
     idLower.includes('397b') ||
+    idLower.includes('120b') ||
     idLower.includes('mistral-large') ||
     idLower.includes('mistral-medium') ||
     idLower.includes('qwen3.8-max') ||

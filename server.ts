@@ -23,6 +23,7 @@ import {
   extractTrustedClientIp,
   normalizeHostHeader,
   RequestSecurityContext,
+  resolveConfiguredTrustProxyHops,
   verifyFirebaseIdTokenHeader,
   verifyRequestOriginAndContext
 } from './src/lib/security/auth-verify.ts';
@@ -111,8 +112,8 @@ export function extractClientIp(req: Request): string {
 }
 
 function resolveRequestHost(req: Request): string {
-  const trustHops = Number.parseInt(process.env.TRUST_PROXY_HOPS || '0', 10);
-  if (Number.isFinite(trustHops) && trustHops >= 1 && trustHops <= 5) {
+  const trustHops = resolveConfiguredTrustProxyHops();
+  if (trustHops >= 1 && trustHops <= 5) {
     const forwardedHost = req.headers['x-forwarded-host'];
     if (typeof forwardedHost === 'string' && forwardedHost.trim()) {
       const normalized = normalizeHostHeader(forwardedHost);
@@ -363,6 +364,10 @@ export const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 app.disable('x-powered-by');
+const configuredProxyHops = resolveConfiguredTrustProxyHops();
+if (configuredProxyHops > 0) {
+  app.set('trust proxy', configuredProxyHops);
+}
 app.use(express.json({ limit: '256kb' }));
 
   app.use((req, res, next) => {

@@ -110,19 +110,39 @@ function isTrustedProxyPeer(ip: string): boolean {
   return lower.startsWith('fc') || lower.startsWith('fd') || lower.startsWith('fe80:');
 }
 
+export const DEFAULT_ALLOWED_ORIGINS = [
+  'https://ais-dev-nsto32mkvjcqoiezkyx4qe-957588401103.asia-southeast1.run.app',
+  'https://ais-pre-nsto32mkvjcqoiezkyx4qe-957588401103.asia-southeast1.run.app',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+] as const;
+
+export function resolveConfiguredTrustProxyHops(explicitHops?: number): number {
+  if (typeof explicitHops === 'number' && Number.isFinite(explicitHops)) {
+    return Math.max(0, Math.min(5, Math.floor(explicitHops)));
+  }
+  const rawEnv = (process.env.TRUST_PROXY_HOPS || '').trim();
+  if (rawEnv !== '') {
+    const parsed = Number.parseInt(rawEnv, 10);
+    if (Number.isFinite(parsed)) {
+      return Math.max(0, Math.min(5, parsed));
+    }
+  }
+  if (process.env.K_SERVICE || process.env.VERCEL || process.env.RENDER) {
+    return 1;
+  }
+  return 0;
+}
+
 export function extractTrustedClientIp(params: {
   socketRemoteAddress?: string | undefined;
   forwardedForHeader?: string | string[] | undefined;
   trustProxyHops?: number;
 }): string {
   const socketIp = normalizeIpAddress(params.socketRemoteAddress);
-  const configuredHops =
-    typeof params.trustProxyHops === 'number'
-      ? Math.floor(params.trustProxyHops)
-      : Number.parseInt(process.env.TRUST_PROXY_HOPS || '0', 10);
+  const configuredHops = resolveConfiguredTrustProxyHops(params.trustProxyHops);
 
   if (
-    Number.isFinite(configuredHops) &&
     configuredHops >= 1 &&
     configuredHops <= 5 &&
     isTrustedProxyPeer(socketIp)
@@ -190,18 +210,22 @@ function getAllowedHostsSet(hostHeader: string | undefined): Set<string> {
     allowed.add(primaryHost);
   }
   const envOrigins = (process.env.ALLOWED_ORIGINS || '').trim();
-  if (envOrigins) {
-    for (const item of envOrigins.split(',')) {
-      const trimmed = item.trim();
-      if (!trimmed) continue;
-      const parsedHost = extractHostFromUrlHeader(trimmed);
-      if (parsedHost && parsedHost !== 'null') {
-        allowed.add(parsedHost);
-      } else {
-        const normalized = normalizeHostHeader(trimmed);
-        if (normalized) {
-          allowed.add(normalized);
-        }
+  const rawList = envOrigins
+    ? envOrigins.split(',')
+    : primaryHost
+      ? []
+      : [...DEFAULT_ALLOWED_ORIGINS];
+
+  for (const item of rawList) {
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    const parsedHost = extractHostFromUrlHeader(trimmed);
+    if (parsedHost && parsedHost !== 'null') {
+      allowed.add(parsedHost);
+    } else {
+      const normalized = normalizeHostHeader(trimmed);
+      if (normalized) {
+        allowed.add(normalized);
       }
     }
   }

@@ -15,6 +15,9 @@ import {
   getEncryptionKey
 } from './crypto.ts';
 
+const TEST_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
+process.env.TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
+
 function signTestRs256Jwt(params: {
   privateKeyPem: string;
   header: Record<string, unknown>;
@@ -30,6 +33,7 @@ function signTestRs256Jwt(params: {
 }
 
 test('rejects missing authentication token even when expectedUid is valid', async () => {
+  process.env.TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
   const result = await verifyFirebaseIdTokenHeader({
     idTokenHeader: undefined,
     cookieHeader: undefined,
@@ -39,6 +43,7 @@ test('rejects missing authentication token even when expectedUid is valid', asyn
 });
 
 test('accepts a valid server session token and rejects tampered signatures', async () => {
+  process.env.TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
   const token = createServerSessionToken({
     uid: 'usr_alice_01',
     email: 'alice@example.com',
@@ -64,6 +69,7 @@ test('accepts a valid server session token and rejects tampered signatures', asy
 });
 
 test('rejects server session token when expectedUid does not match token subject', async () => {
+  process.env.TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
   const token = createServerSessionToken({
     uid: 'usr_alice_01',
     email: 'alice@example.com',
@@ -78,6 +84,7 @@ test('rejects server session token when expectedUid does not match token subject
 });
 
 test('rejects expired server session token', async () => {
+  process.env.TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
   const expiredToken = createServerSessionToken({
     uid: 'usr_alice_01',
     email: 'alice@example.com',
@@ -93,6 +100,7 @@ test('rejects expired server session token', async () => {
 });
 
 test('verifies RS256 Firebase ID token signature, issuer, audience, and expiration', async () => {
+  process.env.TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
   const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
     modulusLength: 2048,
     publicKeyEncoding: { type: 'spki', format: 'pem' },
@@ -190,24 +198,24 @@ test('verifies RS256 Firebase ID token signature, issuer, audience, and expirati
   }
 });
 
-test('enforces mandatory TOKEN_ENCRYPTION_KEY in production and roundtrips AES-256-GCM', () => {
-  const prevNodeEnv = process.env.NODE_ENV;
+test('getEncryptionKey() unconditionally throws if TOKEN_ENCRYPTION_KEY is undefined, empty, or too short', () => {
   const prevKey = process.env.TOKEN_ENCRYPTION_KEY;
 
   try {
-    process.env.NODE_ENV = 'production';
     delete process.env.TOKEN_ENCRYPTION_KEY;
-    assert.throws(() => assertCryptoConfiguration(), /TOKEN_ENCRYPTION_KEY/);
-    assert.throws(() => getEncryptionKey(), /TOKEN_ENCRYPTION_KEY/);
+    assert.throws(() => getEncryptionKey(), /TOKEN_ENCRYPTION_KEY environment variable is not defined/);
+    assert.throws(() => assertCryptoConfiguration(), /TOKEN_ENCRYPTION_KEY environment variable is not defined/);
 
-    process.env.TOKEN_ENCRYPTION_KEY = 'short-key';
-    assert.throws(() => assertCryptoConfiguration(), /at least 16 characters/);
+    process.env.TOKEN_ENCRYPTION_KEY = '   ';
+    assert.throws(() => getEncryptionKey(), /TOKEN_ENCRYPTION_KEY environment variable is not defined/);
+
+    process.env.TOKEN_ENCRYPTION_KEY = 'too-short-key';
+    assert.throws(() => getEncryptionKey(), /must be at least 32 characters/);
 
     process.env.TOKEN_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
     const encrypted = encryptToken('oauth-secret-refresh-token');
     assert.equal(decryptToken(encrypted), 'oauth-secret-refresh-token');
   } finally {
-    process.env.NODE_ENV = prevNodeEnv;
     if (prevKey === undefined) {
       delete process.env.TOKEN_ENCRYPTION_KEY;
     } else {

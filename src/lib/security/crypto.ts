@@ -1,35 +1,51 @@
 import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const MIN_PRODUCTION_SECRET_LENGTH = 16;
-const EPHEMERAL_PROCESS_KEY = crypto.randomBytes(32);
+const MIN_SECRET_LENGTH = 32;
 
 export function assertCryptoConfiguration(): void {
-  const rawKey = (process.env.TOKEN_ENCRYPTION_KEY || '').trim();
-  const isProduction = process.env.NODE_ENV === 'production';
+  const rawKey = process.env.TOKEN_ENCRYPTION_KEY?.trim();
 
-  if (isProduction && !rawKey) {
+  if (!rawKey) {
     throw new Error(
-      'TOKEN_ENCRYPTION_KEY environment variable is mandatory in production deployments.'
+      'TOKEN_ENCRYPTION_KEY environment variable is not defined. A cryptographically secure, environment-unique key is required.'
     );
   }
 
-  if (isProduction && rawKey.length < MIN_PRODUCTION_SECRET_LENGTH) {
+  if (rawKey.length < MIN_SECRET_LENGTH) {
     throw new Error(
-      `TOKEN_ENCRYPTION_KEY must be at least ${MIN_PRODUCTION_SECRET_LENGTH} characters in production deployments.`
+      `TOKEN_ENCRYPTION_KEY must be at least ${MIN_SECRET_LENGTH} characters long.`
     );
   }
 }
 
 export function getEncryptionKey(): Buffer {
-  assertCryptoConfiguration();
-  const rawKey = (process.env.TOKEN_ENCRYPTION_KEY || '').trim();
+  const rawKey = process.env.TOKEN_ENCRYPTION_KEY?.trim();
+
   if (!rawKey) {
-    return EPHEMERAL_PROCESS_KEY;
+    throw new Error(
+      'TOKEN_ENCRYPTION_KEY environment variable is not defined. A cryptographically secure, environment-unique key is required.'
+    );
   }
-  if (rawKey.length === 64 && /^[0-9a-fA-F]+$/.test(rawKey)) {
+
+  if (rawKey.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `TOKEN_ENCRYPTION_KEY must be at least ${MIN_SECRET_LENGTH} characters long.`
+    );
+  }
+
+  if (rawKey.length === 64 && /^[0-9a-fA-F]{64}$/.test(rawKey)) {
     return Buffer.from(rawKey, 'hex');
   }
+
+  const base64Bytes = Buffer.from(rawKey, 'base64');
+  if (
+    base64Bytes.length === 32 &&
+    base64Bytes.toString('base64').replace(/=+$/, '') === rawKey.replace(/=+$/, '')
+  ) {
+    return base64Bytes;
+  }
+
   return crypto.createHash('sha256').update(rawKey, 'utf8').digest();
 }
 

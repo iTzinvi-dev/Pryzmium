@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import crypto from 'crypto';
 import dns from 'node:dns';
 import net from 'node:net';

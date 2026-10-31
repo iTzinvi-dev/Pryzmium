@@ -74,7 +74,9 @@ const app = initializeApp(
         projectId: firebaseConfig.projectId || 'local-workspace'
       }
 );
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+export const db = firebaseConfig.firestoreDatabaseId
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
 
 let initializedAuth: Auth | null = null;
 if (isFirebaseConfigured) {

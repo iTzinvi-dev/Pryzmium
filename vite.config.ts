@@ -30,7 +30,7 @@ function decodeWebConfigFallback(): LocalFirebaseConfig {
 function readLocalFirebaseConfig(): LocalFirebaseConfig {
   const fallback = decodeWebConfigFallback();
   try {
-    const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
+    const configPath = path.resolve(import.meta.dirname, 'firebase-applet-config.json');
     if (fs.existsSync(configPath)) {
       const fileCfg = JSON.parse(fs.readFileSync(configPath, 'utf8')) as LocalFirebaseConfig;
       return { ...fallback, ...fileCfg };
@@ -78,7 +78,7 @@ export default defineConfig(() => {
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.')
+        '@': path.resolve(import.meta.dirname, '.')
       }
     },
     server: {

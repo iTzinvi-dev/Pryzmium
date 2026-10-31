@@ -291,7 +291,7 @@ const ChatRequestSchema = z.object({
     .array(
       z.object({
         role: z.enum(['user', 'assistant']),
-        content: z.string().max(4000)
+        content: z.string().max(8000)
       })
     )
     .max(12)
@@ -903,7 +903,7 @@ app.use(express.json({ limit: '256kb' }));
           res,
           createValidationError(
             `Invalid request payload: ${formattedIssues}`,
-            'Ensure your prompt is between 1 and 2,500 characters and a valid AI model is selected.'
+            'Ensure your prompt is between 1 and 16,000 characters and a valid AI model is selected.'
           )
         );
         return;

@@ -25,8 +25,8 @@ export const RATE_LIMIT_CONFIG = {
     PROVIDER_DAILY_LIMITS_24H.gemini +
     PROVIDER_DAILY_LIMITS_24H.groq +
     PROVIDER_DAILY_LIMITS_24H.xkiro,
-  maxTokensPerDay: 60_000,
-  maxMessageLength: 4_000
+  maxTokensPerDay: 120_000,
+  maxMessageLength: 16_000
 };
 
 export const SIGN_IN_LIMIT_CONFIG = {

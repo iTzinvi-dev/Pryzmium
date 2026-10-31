@@ -20,7 +20,7 @@ export const ChatHistoryMessageSchema = z.object({
     .string()
     .trim()
     .min(1, 'History message content cannot be empty.')
-    .max(4000, 'History message content exceeds 4,000 characters.')
+    .max(8000, 'History message content exceeds 8,000 characters.')
 });
 
 export const ChatRequestPayloadSchema = z.object({
@@ -39,7 +39,7 @@ export const ChatRequestPayloadSchema = z.object({
     .string()
     .trim()
     .min(1, 'Prompt message cannot be empty.')
-    .max(4000, 'Prompt message cannot exceed 4,000 characters.'),
+    .max(16000, 'Prompt message cannot exceed 16,000 characters.'),
   history: z
     .array(ChatHistoryMessageSchema)
     .max(10, 'Conversation history window cannot exceed 10 messages.'),
@@ -51,7 +51,7 @@ export const ChatRequestPayloadSchema = z.object({
 
 export type ValidatedChatRequestPayload = z.infer<typeof ChatRequestPayloadSchema>;
 
-export const CHAT_REQUEST_TIMEOUT_MS = 45_000;
+export const CHAT_REQUEST_TIMEOUT_MS = 75_000;
 
 export type NetworkFailureKind = 'timeout' | 'offline' | 'dns' | 'unreachable' | 'aborted';
 
@@ -93,7 +93,7 @@ export function formatZodValidationBanner(
     failureKind: 'validation',
     title: 'Invalid Request Format (400)',
     message: formattedIssues.join(' | '),
-    hint: 'Ensure your user session is active, a valid AI model is selected, and your message is between 1 and 4,000 characters.',
+    hint: 'Ensure your user session is active, a valid AI model is selected, and your message is between 1 and 16,000 characters.',
     modelId,
     endpoint: '/api/chat',
     timestamp: new Date().toISOString()

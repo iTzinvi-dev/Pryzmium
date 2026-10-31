@@ -829,9 +829,14 @@ async function copyToClipboard(value: string): Promise<boolean> {
   }
 }
 
+const FRONTEND_ROBOTIC_COMMENT_REGEX =
+  /^\s*(?:\/\/|#|\/\*+|<!--)\s*(?:start|end|beginning)\s+of\s+[\w\s-]{1,50}(?:\*+\/|-->)?\s*$/i;
+
 function normalizeCodeBlock(rawCode: string): string {
   const unified = rawCode.replace(/\r\n/g, '\n').replace(/\t/g, '  ');
-  const lines = unified.split('\n');
+  const lines = unified
+    .split('\n')
+    .filter((line) => !FRONTEND_ROBOTIC_COMMENT_REGEX.test(line));
 
   while (lines.length > 0 && lines[0].trim() === '') {
     lines.shift();
@@ -2875,7 +2880,7 @@ export default function App() {
       .slice(-8)
       .map((m) => ({
         role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
-        content: m.content.trim().slice(0, 4000)
+        content: m.content.trim().slice(0, 8000)
       }));
 
     const effectiveModelId = normalizeWorkspaceModelId(selectedModelId);

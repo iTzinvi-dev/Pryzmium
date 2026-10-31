@@ -246,25 +246,25 @@ export const MODEL_ALLOWLIST: ModelRegistryEntry[] = [
     id: 'groq/deepseek-r1-distill-qwen-32b',
     label: 'DeepSeek R1 Distill Qwen 32B',
     provider: 'groq',
-    providerModelName: 'qwen/qwen3.8-27b',
+    providerModelName: 'openai/gpt-oss-120b',
     supportsTools: true,
     costTier: 'free',
     contextWindow: '128K',
-    bestFor: 'Fast algorithmic coding & mathematical deduction',
+    bestFor: 'Frontier algorithmic coding, system architecture & mathematical deduction',
     dailyLimit24h: 10,
-    description: 'Fast algorithmic coding & mathematical deduction'
+    description: 'Frontier algorithmic coding, system architecture & mathematical deduction'
   },
   {
     id: 'groq/qwen-2.5-coder-32b',
     label: 'Qwen 2.5 Coder 32B',
     provider: 'groq',
-    providerModelName: 'qwen/qwen3.8-27b',
+    providerModelName: 'openai/gpt-oss-120b',
     supportsTools: true,
     costTier: 'free',
     contextWindow: '128K',
-    bestFor: 'Rapid code generation, refactoring & syntax analysis',
+    bestFor: 'Frontier code generation, full-stack refactoring & deep syntax analysis',
     dailyLimit24h: 10,
-    description: 'Rapid code generation, refactoring & syntax analysis'
+    description: 'Frontier code generation, full-stack refactoring & deep syntax analysis'
   },
   {
     id: 'groq/qwen-2.5-32b',
@@ -884,15 +884,15 @@ const LEGACY_PROVIDER_MODEL_ALIASES: Record<string, string> = {
   'llama-3.3-70b-versatile': 'openai/gpt-oss-120b',
   'deepseek-r1-distill-llama-70b': 'openai/gpt-oss-120b',
   'llama-3.2-90b-vision-preview': 'openai/gpt-oss-120b',
-  'deepseek-r1-distill-qwen-32b': 'qwen/qwen3.8-27b',
-  'qwen-2.5-coder-32b': 'qwen/qwen3.8-27b',
+  'deepseek-r1-distill-qwen-32b': 'openai/gpt-oss-120b',
+  'qwen-2.5-coder-32b': 'openai/gpt-oss-120b',
   'qwen-2.5-32b': 'qwen/qwen3.8-27b',
   'llama-3.2-11b-vision-preview': 'qwen/qwen3.8-27b',
   'llama-3.1-8b-instant': 'openai/gpt-oss-20b',
   'gemma2-9b-it': 'openai/gpt-oss-20b',
   'whisper-large-v3-turbo': 'openai/gpt-oss-20b',
   'meta-llama/llama-3.1-405b-instruct:free': 'nvidia/nemotron-3-ultra-550b-a55b:free',
-  'qwen/qwen-2.5-coder-32b-instruct:free': 'cohere/north-mini-code:free',
+  'qwen/qwen-2.5-coder-32b-instruct:free': 'nvidia/nemotron-3-ultra-550b-a55b:free',
   'meta-llama/llama-3.3-70b-instruct:free': 'openrouter/free',
   'mistralai/mistral-7b-instruct:free': 'liquid/lfm-2.5-2.6b:free',
   'meta-llama/llama-3.2-11b-vision-instruct:free': 'nvidia/nemotron-3.5-super-vl:free',
@@ -1175,34 +1175,181 @@ function normalizeJsonSchemaForOpenAI(schema: unknown): unknown {
   return result;
 }
 
-function getProviderModelCandidates(provider: ModelProvider, requestedModelName: string): string[] {
+export function isCodingModelEntry(entry: ModelRegistryEntry): boolean {
+  const composite = `${entry.id} ${entry.providerModelName} ${entry.label} ${entry.bestFor}`.toLowerCase();
+  return (
+    composite.includes('coder') ||
+    composite.includes('codestral') ||
+    composite.includes('devstral') ||
+    composite.includes('mini-code') ||
+    composite.includes('deepseek-r1') ||
+    composite.includes('gpt-oss-120b') ||
+    composite.includes('nemotron-3-ultra-550b') ||
+    composite.includes('qwen3.8-max') ||
+    composite.includes('qwen3.7-max') ||
+    composite.includes('qwen3.6-max') ||
+    composite.includes('qwen3-max') ||
+    composite.includes('qwen3.6-35b-a3b') ||
+    composite.includes('mistral-large')
+  );
+}
+
+const CODING_PROMPT_PATTERN =
+  /\b(code|coding|program|programming|function|component|class|interface|type|typedef|struct|enum|algorithm|implement|implementation|refactor|debug|debugging|bug|fix|error|exception|stack\s*trace|compile|compiler|build|lint|typescript|javascript|tsx|jsx|python|rust|golang|java|kotlin|swift|csharp|c\+\+|cpp|php|ruby|sql|postgres|postgresql|mysql|sqlite|mongodb|firestore|redis|prisma|drizzle|graphql|rest\s*api|endpoint|webhook|middleware|express|fastify|nextjs|react|vue|svelte|angular|tailwind|html|html5|css|scss|dockerfile|docker|kubernetes|bash|shell|script|regex|unit\s*test|jest|vitest|pytest|playwright|cypress|oauth|jwt|encryption|crypto|csrf|xss|sqli|vulnerability|exploit|security|optimize|complexity|leetcode|data\s*structure|binary\s*tree|dynamic\s*programming|full-?stack|frontend|backend|microservice|architecture|schema|migration|likhe\s*dao|bania\s*dao|kor)\b|```|(?:^\s*(?:import|export|const|let|var|function|async|def|class|interface|type|SELECT|INSERT|UPDATE|DELETE|CREATE\s+TABLE)\b)/im;
+
+export function detectCodingTaskIntent(messages: AgentConversationMessage[]): boolean {
+  const recentUserMessages = messages
+    .filter((m) => m.role === 'user')
+    .slice(-3)
+    .map((m) => m.content || '')
+    .join('\n');
+  if (!recentUserMessages.trim()) {
+    return false;
+  }
+  return CODING_PROMPT_PATTERN.test(recentUserMessages);
+}
+
+const ROBOTIC_COMMENT_LINE_PATTERNS: RegExp[] = [
+  /^\s*(?:\/\/|#|\/\*+|<!--)\s*(?:start|end|beginning)\s+of\s+[\w\s-]{1,50}(?:\*+\/|-->)?\s*$/i,
+  /^\s*(?:\/\/|#)\s*(?:todo|fixme)\s*:\s*(?:implement|add|insert|write|complete)\b.*$/i,
+  /^\s*(?:\/\/|#)\s*\.\.\.\s*(?:rest\s+of|existing|remaining)\s+code.*$/i,
+  /^\s*\/\*\s*\.\.\.\s*(?:rest\s+of|existing|remaining)\s+code.*\*\/\s*$/i
+];
+
+function inferCodeFenceLanguage(code: string): string {
+  const sample = code.trim();
+  if (!sample) return 'plaintext';
+  if (/^\s*<!DOCTYPE\s+html>|^\s*<(?:html|head|body|header|main|section|article|nav|footer|div|form|button)\b/i.test(sample)) {
+    return 'html';
+  }
+  if (/\b(?:interface\s+[A-Z]\w*|type\s+[A-Z]\w*\s*=|:\s*(?:string|number|boolean|Record<|Array<|Promise<|React\.|ReactNode|JSX\.))/m.test(sample)) {
+    return /<[A-Za-z][\w.-]*[\s/>]/.test(sample) ? 'tsx' : 'typescript';
+  }
+  if (/\b(?:import\s+React|useState\(|useEffect\(|useCallback\(|useMemo\(|className=)/m.test(sample)) {
+    return 'tsx';
+  }
+  if (/^\s*(?:import\s+[\w*{}\s,]+\s+from\s+['"]|export\s+(?:default\s+)?(?:function|const|class)\b|const\s+\w+\s*=\s*(?:async\s*)?\()/m.test(sample)) {
+    return 'javascript';
+  }
+  if (/^\s*(?:def\s+\w+\s*\(|from\s+[\w.]+\s+import\s+|import\s+(?:os|sys|re|json|asyncio|typing| pathlib|numpy|pandas|torch)\b|if\s+__name__\s*==\s*['"]__main__['"]\s*:)/m.test(sample)) {
+    return 'python';
+  }
+  if (/^\s*(?:SELECT|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+(?:TABLE|INDEX|VIEW)|ALTER\s+TABLE|WITH\s+\w+\s+AS)\b/im.test(sample)) {
+    return 'sql';
+  }
+  if (/^\s*(?:fn\s+\w+|pub\s+(?:fn|struct|enum|mod)|use\s+std::|impl\s+\w+|let\s+mut\s+)/m.test(sample)) {
+    return 'rust';
+  }
+  if (/^\s*(?:package\s+\w+|func\s+(?:\(\w+\s+\*?\w+\)\s*)?\w+\(|import\s+\()/m.test(sample)) {
+    return 'go';
+  }
+  if (/^\s*(?:#!\/bin\/(?:env\s+)?(?:bash|sh|zsh)|(?:npm|npx|yarn|pnpm|git|docker|kubectl|curl|chmod|mkdir|apt-get)\s+)/m.test(sample)) {
+    return 'bash';
+  }
+  if (/^\s*(?:@media\b|@keyframes\b|:root\s*\{|\.[a-zA-Z_-][\w-]*\s*\{[^}]*:\s*[^}]+\})/m.test(sample)) {
+    return 'css';
+  }
+  if (
+    (sample.startsWith('{') && sample.endsWith('}')) ||
+    (sample.startsWith('[') && sample.endsWith(']'))
+  ) {
+    try {
+      JSON.parse(sample);
+      return 'json';
+    } catch {
+      void 0;
+    }
+  }
+  return 'typescript';
+}
+
+export function sanitizeGeneratedCodeResponse(rawText: string): string {
+  if (!rawText || typeof rawText !== 'string') {
+    return '';
+  }
+
+  const normalized = rawText.replace(/\r\n/g, '\n');
+  return normalized.replace(
+    /```([a-zA-Z0-9_+.#-]*)?[ \t]*\n([\s\S]*?)```/g,
+    (_fullMatch, rawLang: string | undefined, rawBody: string) => {
+      const cleanedLines = (rawBody || '')
+        .replace(/\t/g, '  ')
+        .split('\n')
+        .filter((line) => !ROBOTIC_COMMENT_LINE_PATTERNS.some((rx) => rx.test(line)))
+        .map((line) => line.replace(/[ \t]+$/g, ''));
+
+      while (cleanedLines.length > 0 && cleanedLines[0].trim() === '') {
+        cleanedLines.shift();
+      }
+      while (cleanedLines.length > 0 && cleanedLines[cleanedLines.length - 1].trim() === '') {
+        cleanedLines.pop();
+      }
+
+      const cleanCode = cleanedLines.join('\n');
+      const langTag = (rawLang || '').trim().toLowerCase() || inferCodeFenceLanguage(cleanCode);
+      return `\`\`\`${langTag}\n${cleanCode}\n\`\`\``;
+    }
+  );
+}
+
+function getProviderModelCandidates(
+  provider: ModelProvider,
+  requestedModelName: string,
+  isCodingTask = false
+): string[] {
   const now = Date.now();
   const normalizedRequested = normalizeProviderModelSlug(provider, requestedModelName);
   let fallbacks: string[] = [];
   if (provider === 'xkiro') {
-    fallbacks = [
-      normalizedRequested,
-      'mistralai/mistral-large-2512',
-      'mistralai/ministral-14b',
-      'qwen/qwen3.7-flash:free',
-      'qwen/qwen3.8-max:free'
-    ];
+    fallbacks = isCodingTask
+      ? [
+          normalizedRequested,
+          'mistralai/codestral-2508',
+          'qwen/qwen3-coder-plus:free',
+          'mistralai/devstral-medium',
+          'qwen/qwen3.8-max:free',
+          'mistralai/mistral-large-2512',
+          'qwen/qwen3.6-35b-a3b:free',
+          'qwen/qwen3.7-flash:free'
+        ]
+      : [
+          normalizedRequested,
+          'mistralai/mistral-large-2512',
+          'qwen/qwen3.8-max:free',
+          'mistralai/ministral-14b',
+          'qwen/qwen3.7-flash:free'
+        ];
   } else if (provider === 'groq') {
-    fallbacks = [
-      normalizedRequested,
-      'openai/gpt-oss-120b',
-      'qwen/qwen3.8-27b',
-      'openai/gpt-oss-20b'
-    ];
+    fallbacks = isCodingTask
+      ? [
+          normalizedRequested,
+          'openai/gpt-oss-120b',
+          'qwen/qwen3.8-27b',
+          'openai/gpt-oss-20b'
+        ]
+      : [
+          normalizedRequested,
+          'openai/gpt-oss-120b',
+          'qwen/qwen3.8-27b',
+          'openai/gpt-oss-20b'
+        ];
   } else if (provider === 'openrouter') {
-    fallbacks = [
-      normalizedRequested,
-      'cohere/north-mini-code:free',
-      'nvidia/nemotron-3.5-super-vl:free',
-      'openrouter/free',
-      'nvidia/nemotron-3-ultra-550b-a55b:free',
-      'liquid/lfm-2.5-2.6b:free'
-    ];
+    fallbacks = isCodingTask
+      ? [
+          normalizedRequested,
+          'nvidia/nemotron-3-ultra-550b-a55b:free',
+          'cohere/north-mini-code:free',
+          'openrouter/free',
+          'nvidia/nemotron-3.5-super-vl:free'
+        ]
+      : [
+          normalizedRequested,
+          'nvidia/nemotron-3-ultra-550b-a55b:free',
+          'cohere/north-mini-code:free',
+          'nvidia/nemotron-3.5-super-vl:free',
+          'openrouter/free',
+          'liquid/lfm-2.5-2.6b:free'
+        ];
   } else {
     fallbacks = [normalizedRequested];
   }
@@ -1218,11 +1365,14 @@ async function callOpenAICompatibleAdapter(params: {
   systemInstruction: string;
   messages: AgentConversationMessage[];
   functionDeclarations: FunctionDeclaration[];
+  isCodingTask?: boolean;
 }): Promise<ModelTurnResponse> {
   const cfg = getOpenAICompatibleConfig(params.entry.provider);
   if (!cfg) {
     throw new Error('Upstream API key is not configured on the server.');
   }
+
+  const isCoding = Boolean(params.isCodingTask || isCodingModelEntry(params.entry));
 
   const openAiMessages: Array<Record<string, unknown>> = [
     { role: 'system', content: params.systemInstruction }
@@ -1256,13 +1406,24 @@ async function callOpenAICompatibleAdapter(params: {
 
   const candidateModels = getProviderModelCandidates(
     params.entry.provider,
-    params.entry.providerModelName
+    params.entry.providerModelName,
+    isCoding
   );
 
-  const executeCompletionRequest = async (modelSlug: string, includeTools: boolean) => {
+  const requestTimeoutMs = isCoding ? 22_000 : 12_500;
+  const samplingParams = isCoding
+    ? { temperature: 0.15, top_p: 0.92, max_tokens: 8192 }
+    : { temperature: 0.35, top_p: 0.95, max_tokens: 4096 };
+
+  const executeCompletionRequest = async (
+    modelSlug: string,
+    includeTools: boolean,
+    includeMaxTokens = true
+  ) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8_500);
+    const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
     try {
+      const { max_tokens, ...baseSampling } = samplingParams;
       return await fetch(`${cfg.baseUrl.replace(/\/$/, '')}/chat/completions`, {
         method: 'POST',
         headers: cfg.headers,
@@ -1270,6 +1431,8 @@ async function callOpenAICompatibleAdapter(params: {
         body: JSON.stringify({
           model: modelSlug,
           messages: openAiMessages,
+          ...baseSampling,
+          ...(includeMaxTokens ? { max_tokens } : {}),
           ...(includeTools && toolsPayload ? { tools: toolsPayload, tool_choice: 'auto' } : {})
         })
       });
@@ -1283,9 +1446,12 @@ async function callOpenAICompatibleAdapter(params: {
   for (const candidateModel of candidateModels) {
     const cooldownKey = `${params.entry.provider}:${candidateModel}`;
     try {
-      let response = await executeCompletionRequest(candidateModel, Boolean(toolsPayload));
+      let response = await executeCompletionRequest(candidateModel, Boolean(toolsPayload), true);
       if (!response.ok && toolsPayload) {
-        response = await executeCompletionRequest(candidateModel, false);
+        response = await executeCompletionRequest(candidateModel, false, true);
+      }
+      if (!response.ok) {
+        response = await executeCompletionRequest(candidateModel, false, false);
       }
 
       const rawText = (await response.text().catch(() => '')).trim();
@@ -1335,7 +1501,10 @@ async function callOpenAICompatibleAdapter(params: {
         }
       }
 
-      const contentText = (choice?.content || choice?.reasoning_content || '').trim();
+      const rawContentText = (choice?.content || choice?.reasoning_content || '').trim();
+      const contentText = isCoding
+        ? sanitizeGeneratedCodeResponse(rawContentText)
+        : rawContentText;
       if (!contentText && toolCalls.length === 0) {
         lastErrorText = 'Empty completion returned by upstream model';
         modelBusyCooldownUntil.set(cooldownKey, Date.now() + 60_000);
@@ -1402,6 +1571,17 @@ function normalizeGeminiContents(messages: AgentConversationMessage[]) {
   return merged;
 }
 
+function resolveRealGeminiApiModelName(rawModelName: string): string {
+  const cleaned = (rawModelName || '').trim();
+  if (cleaned === 'gemini-3.8-flash') {
+    return 'gemini-3-flash-preview';
+  }
+  if (cleaned === 'gemini-3.1-flash-lite') {
+    return 'gemini-3.1-flash-lite-preview';
+  }
+  return cleaned || 'gemini-3-flash-preview';
+}
+
 async function callSingleGeminiModelWithTimeout(params: {
   modelName: string;
   usedModelId: string;
@@ -1411,30 +1591,35 @@ async function callSingleGeminiModelWithTimeout(params: {
   functionDeclarations: FunctionDeclaration[];
   fallbackNotice?: string;
   timeoutMs?: number;
+  isCodingTask?: boolean;
 }): Promise<ModelTurnResponse> {
   const ai = getGeminiClient();
   const contents = normalizeGeminiContents(params.messages);
+  const apiModelName = resolveRealGeminiApiModelName(params.modelName);
 
   const toolsConfig =
     params.supportsTools && params.functionDeclarations.length > 0
       ? [{ functionDeclarations: params.functionDeclarations }]
       : undefined;
 
-  const timeoutMs = params.timeoutMs || 20_000;
+  const timeoutMs = params.timeoutMs || (params.isCodingTask ? 24_000 : 15_000);
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
   const response = await Promise.race([
     ai.models.generateContent({
-      model: params.modelName,
+      model: apiModelName,
       contents,
       config: {
         systemInstruction: params.systemInstruction,
+        temperature: params.isCodingTask ? 0.15 : 0.35,
+        topP: params.isCodingTask ? 0.92 : 0.95,
+        maxOutputTokens: 8192,
         ...(toolsConfig ? { tools: toolsConfig } : {})
       }
     }),
     new Promise<never>((_, reject) => {
       timeoutHandle = setTimeout(
-        () => reject(new Error(`Model ${params.modelName} timed out after ${timeoutMs}ms`)),
+        () => reject(new Error(`Model ${apiModelName} timed out after ${timeoutMs}ms`)),
         timeoutMs
       );
     })
@@ -1457,11 +1642,14 @@ async function callSingleGeminiModelWithTimeout(params: {
   }
 
   const candidateParts = response.candidates?.[0]?.content?.parts || [];
-  const extractedText = candidateParts
+  const rawExtractedText = candidateParts
     .map((part) => (typeof part.text === 'string' ? part.text : ''))
     .filter(Boolean)
     .join('\n')
     .trim();
+  const extractedText = params.isCodingTask
+    ? sanitizeGeneratedCodeResponse(rawExtractedText)
+    : rawExtractedText;
 
   const estimatedTokens =
     response.usageMetadata?.totalTokenCount ||
@@ -1486,20 +1674,35 @@ async function callGeminiAdapter(params: {
   messages: AgentConversationMessage[];
   functionDeclarations: FunctionDeclaration[];
   fallbackNotice?: string;
+  isCodingTask?: boolean;
 }): Promise<ModelTurnResponse> {
   const now = Date.now();
+  const primaryModel = resolveRealGeminiApiModelName(params.modelName);
   const baseCandidates = Array.from(
-    new Set([
-      'gemini-3.1-flash-lite',
-      params.modelName,
-      'gemini-3.8-flash',
-      'gemini-flash-latest'
-    ])
+    new Set(
+      params.isCodingTask
+        ? [
+            primaryModel,
+            'gemini-3-flash-preview',
+            'gemini-3.1-pro-preview',
+            'gemini-2.5-pro',
+            'gemini-2.5-flash',
+            'gemini-flash-latest'
+          ]
+        : [
+            primaryModel,
+            'gemini-3-flash-preview',
+            'gemini-2.5-flash',
+            'gemini-flash-latest',
+            'gemini-3.1-flash-lite-preview'
+          ]
+    )
   );
 
   const availableFirst = baseCandidates.filter((m) => (modelBusyCooldownUntil.get(m) || 0) <= now);
   const coolingDown = baseCandidates.filter((m) => (modelBusyCooldownUntil.get(m) || 0) > now);
   const orderedCandidates = [...availableFirst, ...coolingDown];
+  const candidateTimeoutMs = params.isCodingTask ? 22_000 : 12_000;
 
   let lastError: unknown = null;
   for (const candidateModel of orderedCandidates) {
@@ -1507,7 +1710,7 @@ async function callGeminiAdapter(params: {
       const res = await callSingleGeminiModelWithTimeout({
         ...params,
         modelName: candidateModel,
-        timeoutMs: 9_000
+        timeoutMs: candidateTimeoutMs
       });
       modelBusyCooldownUntil.delete(candidateModel);
       return res;
@@ -1518,14 +1721,14 @@ async function callGeminiAdapter(params: {
   }
 
   if (params.supportsTools && params.functionDeclarations.length > 0) {
-    for (const fallbackModel of ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest']) {
+    for (const fallbackModel of ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-flash-latest']) {
       try {
         return await callSingleGeminiModelWithTimeout({
           ...params,
           modelName: fallbackModel,
           supportsTools: false,
           functionDeclarations: [],
-          timeoutMs: 9_000
+          timeoutMs: candidateTimeoutMs
         });
       } catch (err) {
         lastError = err;
@@ -1563,9 +1766,17 @@ export async function invokeModelWithFallback(params: {
   systemInstruction: string;
   messages: AgentConversationMessage[];
   functionDeclarations: FunctionDeclaration[];
+  isCodingTask?: boolean;
 }): Promise<ModelTurnResponse> {
   const entry = getAllowlistedModel(params.requestedModelId);
-  const roleContext = `\nActive Selected Model Profile: ${entry.label}. Specialty: ${entry.bestFor}. Tailor your reasoning depth, coding precision, or response speed to match this profile.`;
+  const isCoding = Boolean(
+    params.isCodingTask || isCodingModelEntry(entry) || detectCodingTaskIntent(params.messages)
+  );
+  const roleContext = `\nActive Selected Model Profile: ${entry.label}. Specialty: ${entry.bestFor}. ${
+    isCoding
+      ? 'Operate in Frontier Principal Software Engineer mode: deliver complete, production-ready, deeply architected, zero-placeholder code with strict type safety and optimal complexity.'
+      : 'Tailor your reasoning depth, coding precision, or response speed to match this profile.'
+  }`;
   const enrichedSystemInstruction = `${params.systemInstruction}${roleContext}`;
 
   if (entry.provider === 'gemini') {
@@ -1576,7 +1787,8 @@ export async function invokeModelWithFallback(params: {
         supportsTools: entry.supportsTools,
         systemInstruction: enrichedSystemInstruction,
         messages: params.messages,
-        functionDeclarations: params.functionDeclarations
+        functionDeclarations: params.functionDeclarations,
+        isCodingTask: isCoding
       });
       markProviderActive('gemini');
       return res;
@@ -1593,7 +1805,8 @@ export async function invokeModelWithFallback(params: {
         entry,
         systemInstruction: enrichedSystemInstruction,
         messages: params.messages,
-        functionDeclarations: params.functionDeclarations
+        functionDeclarations: params.functionDeclarations,
+        isCodingTask: isCoding
       });
       markProviderActive(entry.provider);
       return res;
@@ -1603,12 +1816,13 @@ export async function invokeModelWithFallback(params: {
   }
 
   const res = await callGeminiAdapter({
-    modelName: 'gemini-3.1-flash-lite',
+    modelName: isCoding ? 'gemini-3-flash-preview' : 'gemini-3.1-flash-lite-preview',
     usedModelId: entry.id,
     supportsTools: entry.supportsTools,
     systemInstruction: enrichedSystemInstruction,
     messages: params.messages,
-    functionDeclarations: params.functionDeclarations
+    functionDeclarations: params.functionDeclarations,
+    isCodingTask: isCoding
   });
   markProviderActive('gemini');
   return res;

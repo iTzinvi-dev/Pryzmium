@@ -2,9 +2,9 @@
 
 **Effective Date:** October 27, 2026
 
-## 1. Mandatory User Consent
+## 1. Mandatory User Consent & Age Eligibility (COPPA / GDPR-K)
 
-Before creating an account, signing in, or executing any AI agent workflow in Vektor Agent Workspace, users must explicitly review and accept this Privacy Policy, Terms of Service, Safety Guardrails, and Essential Cookie Policy.
+Before creating an account, signing in, or executing any AI agent workflow in Pryzmium, users must explicitly confirm that they are at least **13 years of age** (and at least **18 years of age** or acting with verifiable parent/legal guardian consent) and accept this Privacy Policy, Terms of Service, Safety Guardrails, and Essential Cookie Policy. Pryzmium does not knowingly collect or process personal information from children under 13; any account identified as belonging to a child under 13 is immediately purged.
 
 ---
 

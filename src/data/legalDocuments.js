@@ -28,10 +28,10 @@ export const LEGAL_DOCUMENTS = {
       },
       {
         id: 'terms-eligibility',
-        heading: '2. Account Registration & Credential Security',
+        heading: '2. Age Eligibility, Account Registration & Credential Security',
         content: [
-          'You must provide accurate registration information and maintain the confidentiality of your session credentials. Authentication is protected by strict sign-in rate limits and token verification.',
-          'You are solely responsible for all agent sessions, connected workspace scopes, and confirmed tool invocations occurring under your account. Notify our security team immediately if you suspect unauthorized access or credential compromise.'
+          'You must be at least 13 years of age to access or create an account on Pryzmium. If you are between 13 and 17 years of age (or under the age of majority in your jurisdiction), you may only use the Services with the verifiable consent and supervision of a parent or legal guardian who agrees to be bound by this Agreement. We do not knowingly collect personal data from children under 13 (COPPA / GDPR-K compliance).',
+          'You must provide accurate registration information and maintain the confidentiality of your session credentials. You are solely responsible for all agent sessions, connected workspace scopes, and confirmed tool invocations occurring under your account.'
         ]
       },
       {

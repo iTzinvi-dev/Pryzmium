@@ -19,6 +19,7 @@ import {
   verifyFirebaseIdTokenHeader
 } from './src/lib/security/auth-verify.ts';
 import {
+  assertCryptoConfiguration,
   canonicalizeArgs,
   computeArgsHash,
   decryptToken,
@@ -529,7 +530,7 @@ app.use(express.json({ limit: '256kb' }));
     res.json({ ok: true });
   });
 
-  app.get('/api/auth/consent', (req, res) => {
+  app.get('/api/auth/consent', async (req, res) => {
     if (!enforceRateLimitBucket(req, res, 'consent')) {
       return;
     }
@@ -547,7 +548,7 @@ app.use(express.json({ limit: '256kb' }));
       return;
     }
 
-    const verified = verifyFirebaseIdTokenHeader({
+    const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
       cookieHeader: req.headers.cookie,
       expectedUid: uid || email
@@ -571,7 +572,7 @@ app.use(express.json({ limit: '256kb' }));
     res.json({ ok: true, accepted });
   });
 
-  app.post('/api/auth/consent', (req, res) => {
+  app.post('/api/auth/consent', async (req, res) => {
     if (!enforceRateLimitBucket(req, res, 'consent')) {
       return;
     }
@@ -591,7 +592,7 @@ app.use(express.json({ limit: '256kb' }));
       return;
     }
 
-    const verified = verifyFirebaseIdTokenHeader({
+    const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
       cookieHeader: req.headers.cookie,
       expectedUid: uid || email
@@ -625,13 +626,13 @@ app.use(express.json({ limit: '256kb' }));
     res.json({ ok: true, accepted: true });
   });
 
-  app.get('/api/models', (req, res) => {
+  app.get('/api/models', async (req, res) => {
     const uid = typeof req.query.uid === 'string' ? req.query.uid.trim() : undefined;
     if (!enforceRateLimitBucket(req, res, 'models', uid)) {
       return;
     }
 
-    const verified = verifyFirebaseIdTokenHeader({
+    const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
       cookieHeader: req.headers.cookie,
       expectedUid: uid
@@ -681,13 +682,13 @@ app.use(express.json({ limit: '256kb' }));
     });
   });
 
-  app.post('/api/quota/reset', (req, res) => {
+  app.post('/api/quota/reset', async (req, res) => {
     const uid = typeof req.body?.uid === 'string' ? req.body.uid.trim() : undefined;
     if (!enforceRateLimitBucket(req, res, 'models', uid)) {
       return;
     }
 
-    const verified = verifyFirebaseIdTokenHeader({
+    const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
       cookieHeader: req.headers.cookie,
       expectedUid: uid
@@ -713,12 +714,12 @@ app.use(express.json({ limit: '256kb' }));
     });
   });
 
-  app.post('/api/shares', (req, res) => {
+  app.post('/api/shares', async (req, res) => {
     if (!enforceRateLimitBucket(req, res, 'shares')) {
       return;
     }
 
-    const verified = verifyFirebaseIdTokenHeader({
+    const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
       cookieHeader: req.headers.cookie
     });
@@ -830,7 +831,7 @@ app.use(express.json({ limit: '256kb' }));
         return;
       }
 
-      const idCheck = verifyFirebaseIdTokenHeader({
+      const idCheck = await verifyFirebaseIdTokenHeader({
         idTokenHeader: getIdTokenHeader(req),
         cookieHeader: req.headers.cookie,
         expectedUid: uid
@@ -945,7 +946,7 @@ app.use(express.json({ limit: '256kb' }));
         return;
       }
 
-      const idCheck = verifyFirebaseIdTokenHeader({
+      const idCheck = await verifyFirebaseIdTokenHeader({
         idTokenHeader: getIdTokenHeader(req),
         cookieHeader: req.headers.cookie,
         expectedUid: uid
@@ -1149,7 +1150,7 @@ app.use(express.json({ limit: '256kb' }));
         return;
       }
 
-      const idCheck = verifyFirebaseIdTokenHeader({
+      const idCheck = await verifyFirebaseIdTokenHeader({
         idTokenHeader: getIdTokenHeader(req),
         cookieHeader: req.headers.cookie,
         expectedUid: uid
@@ -1329,7 +1330,7 @@ app.use(express.json({ limit: '256kb' }));
     }
   });
 
-  app.post('/api/connections/encrypt-token', (req, res) => {
+  app.post('/api/connections/encrypt-token', async (req, res) => {
     const parsed = EncryptDemoSchema.safeParse(req.body);
     if (!parsed.success) {
       sendCustomError(
@@ -1346,7 +1347,7 @@ app.use(express.json({ limit: '256kb' }));
       return;
     }
 
-    const verified = verifyFirebaseIdTokenHeader({
+    const verified = await verifyFirebaseIdTokenHeader({
       idTokenHeader: getIdTokenHeader(req),
       cookieHeader: req.headers.cookie,
       expectedUid: parsed.data.uid
@@ -1398,6 +1399,7 @@ app.use(express.json({ limit: '256kb' }));
   });
 
 async function startServer() {
+  assertCryptoConfiguration();
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

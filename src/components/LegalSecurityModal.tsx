@@ -211,7 +211,7 @@ export function LegalSecurityModal({
                     className="mt-0.5 h-4 w-4 rounded accent-[var(--accent-primary)] shrink-0"
                   />
                   <span>
-                    I have read and accept the <strong>Privacy Policy, Terms of Service &amp; Safety Rules</strong>.
+                    I confirm I am at least 13 years old (and 18+ or have parent/guardian consent) and accept the <strong>Privacy Policy, Terms of Service &amp; Safety Rules</strong>.
                   </span>
                 </label>
               </div>

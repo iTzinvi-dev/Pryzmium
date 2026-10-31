@@ -4690,7 +4690,7 @@ export default function App() {
                       style={{ accentColor: 'var(--accent-primary)' }}
                     />
                     <span className="leading-relaxed theme-text-secondary">
-                      I accept the mandatory{' '}
+                      I confirm I am at least 13 years old (and 18+ or have parent/guardian consent) and accept the mandatory{' '}
                       <button
                         type="button"
                         onClick={() => openLegalHub('privacy')}

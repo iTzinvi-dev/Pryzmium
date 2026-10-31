@@ -798,7 +798,15 @@ export async function getFirebaseIdToken(): Promise<string | null> {
     cachedServerUser = persisted.user;
     return persisted.sessionToken;
   }
-  if (!auth?.currentUser) return null;
+  if (!auth) return null;
+  if (!auth.currentUser && typeof auth.authStateReady === 'function') {
+    try {
+      await auth.authStateReady();
+    } catch {
+      void 0;
+    }
+  }
+  if (!auth.currentUser) return null;
   try {
     return await auth.currentUser.getIdToken();
   } catch {

@@ -1,13 +1,36 @@
 import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
+const MIN_PRODUCTION_SECRET_LENGTH = 16;
+const EPHEMERAL_PROCESS_KEY = crypto.randomBytes(32);
 
-function getEncryptionKey(): Buffer {
-  const rawKey = process.env.TOKEN_ENCRYPTION_KEY || '';
+export function assertCryptoConfiguration(): void {
+  const rawKey = (process.env.TOKEN_ENCRYPTION_KEY || '').trim();
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (isProduction && !rawKey) {
+    throw new Error(
+      'TOKEN_ENCRYPTION_KEY environment variable is mandatory in production deployments.'
+    );
+  }
+
+  if (isProduction && rawKey.length < MIN_PRODUCTION_SECRET_LENGTH) {
+    throw new Error(
+      `TOKEN_ENCRYPTION_KEY must be at least ${MIN_PRODUCTION_SECRET_LENGTH} characters in production deployments.`
+    );
+  }
+}
+
+export function getEncryptionKey(): Buffer {
+  assertCryptoConfiguration();
+  const rawKey = (process.env.TOKEN_ENCRYPTION_KEY || '').trim();
+  if (!rawKey) {
+    return EPHEMERAL_PROCESS_KEY;
+  }
   if (rawKey.length === 64 && /^[0-9a-fA-F]+$/.test(rawKey)) {
     return Buffer.from(rawKey, 'hex');
   }
-  return crypto.createHash('sha256').update(rawKey || 'vektor-agent-default-kms-seed-2026').digest();
+  return crypto.createHash('sha256').update(rawKey, 'utf8').digest();
 }
 
 export interface EncryptedPayload {

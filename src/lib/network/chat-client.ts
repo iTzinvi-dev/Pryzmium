@@ -229,6 +229,7 @@ export async function fetchChatWithTimeout(params: {
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
+      credentials: 'same-origin',
       headers,
       signal: combinedSignal,
       body: JSON.stringify(payload)
